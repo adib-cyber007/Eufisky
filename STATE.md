@@ -88,6 +88,7 @@ Open http://localhost:8000 and http://localhost:8000/api/health.
 - Used current official AssemblyAI APIs: v3 Universal Streaming with `universal-3-5-pro`, inline Voice Agent sessions, and LLM Gateway as the documented LeMUR successor.
 - Kept phone/browser audio at the specified 16 kHz; resampled only the Voice Agent probe input in memory to its required 24 kHz.
 - Kept Groq and Gemini unset because Voice Agent passed and no fallback key is required in Phase 0.
+- Goal execution elapsed time: about 43 minutes.
 
 HUMAN ACTIONS REQUIRED NOW:
 
