@@ -86,7 +86,7 @@ STATE SNAPSHOT:
 - Dashboard: http://localhost:8000/dashboard?room=demo
 - Health: http://localhost:8000/api/health
 
-The current Phase 2 server was left running on port 8000 after verification.
+The current Phase 1 server was left running on port 8000 after verification.
 
 (f) Decisions/defaults chosen
 
@@ -98,7 +98,7 @@ The current Phase 2 server was left running on port 8000 after verification.
 - Added a small temporary REST action for the Dashboard family-ring button while keeping the documented phone/dashboard protocols intact.
 - Used a calm household-handset visual language with large controls, strong contrast, and responsive layouts rather than a generic card dashboard.
 - Repaired the laptop's registered Python 3.12.10 installation because the existing `.venv` launcher target had gone missing. The same virtual environment works again.
-- Preserved the owner's unrelated untracked `STATE_after_phase0.txt` file and did not include it in the Phase 2 commit.
+- Preserved the owner's unrelated untracked `STATE_after_phase0.txt` file and did not include it in the Phase 1 commit.
 
 HUMAN ACTIONS REQUIRED NOW:
 
