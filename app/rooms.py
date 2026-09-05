@@ -100,6 +100,7 @@ class RoomRegistry:
             "trigger": "snapshot",
             "call_id": call.id if call else None,
             "classification": call.classification if call else None,
+            "guardian_outcome": call.guardian_outcome if call else None,
         }
 
 

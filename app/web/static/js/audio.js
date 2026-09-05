@@ -12,6 +12,7 @@
       this.processor = null;
       this.pending = [];
       this.playAt = 0;
+      this.holdTimer = null;
     }
 
     async ensureContext() {
@@ -123,6 +124,32 @@
         oscillator.start(context.currentTime + offset);
         oscillator.stop(context.currentTime + offset + 0.18);
       });
+    }
+
+    async holdMusic(on) {
+      if (!on) {
+        if (this.holdTimer) clearInterval(this.holdTimer);
+        this.holdTimer = null;
+        return;
+      }
+      if (this.holdTimer) return;
+      const playPhrase = async () => {
+        const context = await this.ensureContext();
+        [392, 494, 587, 494].forEach((frequency, index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const start = context.currentTime + index * 0.32;
+          oscillator.frequency.value = frequency;
+          oscillator.type = "sine";
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(0.045, start + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(start); oscillator.stop(start + 0.3);
+        });
+      };
+      await playPhrase();
+      this.holdTimer = setInterval(playPhrase, 2400);
     }
   }
 

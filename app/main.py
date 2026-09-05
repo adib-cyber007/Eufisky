@@ -137,4 +137,9 @@ async def ring_family(room: str) -> dict[str, bool]:
     return {"ok": await calls.ring_family(room)}
 
 
+@app.post("/api/rooms/{room}/calls/current/guardian/{action}")
+async def guardian_action(room: str, action: str) -> dict[str, bool]:
+    return {"ok": await calls.guardian_action(room, "dashboard", action)}
+
+
 __all__ = ["app", "settings"]

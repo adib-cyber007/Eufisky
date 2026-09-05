@@ -68,3 +68,13 @@ class EventPublisher:
         }
         db.add_event(self.call_id, t_ms, "level", payload)
         await self.room.broadcast_dashboard(payload)
+
+    async def tool(
+        self, t_ms: int, agent: str, name: str, args: dict[str, Any]
+    ) -> None:
+        payload = {
+            "type": "tool", "call_id": self.call_id, "t_ms": t_ms,
+            "agent": agent, "name": name, "args": args,
+        }
+        db.add_event(self.call_id, t_ms, "tool", payload)
+        await self.room.broadcast_dashboard(payload)

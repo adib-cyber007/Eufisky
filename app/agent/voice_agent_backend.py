@@ -69,7 +69,7 @@ class VoiceAgentBackend:
                 "type": "session.update",
                 "session": {
                     "system_prompt": instructions,
-                    "greeting": (
+                    "greeting": context.get("greeting") or (
                         f"Hello, you've reached {context.get('senior_name', settings.senior_name)}'s line. "
                         "May I ask who's calling and what it's regarding?"
                     ),
@@ -155,8 +155,10 @@ class VoiceAgentBackend:
         await self.socket.send(json.dumps({
             "type": "reply.create",
             "instructions": (
-                "Follow the Front Door rules now. If the caller supplied both a name and a "
-                "reason, call exactly one registered tool rather than merely paraphrasing them."
+                "Follow the Guardian rules and call exactly one registered tool for the senior's choice."
+                if self._context.get("agent_role") == "guardian" else
+                "Follow the Front Door rules now. If the caller supplied both a name and a reason, "
+                "call exactly one registered tool rather than merely paraphrasing them."
             ),
         }))
         expected_count = self._tool_count

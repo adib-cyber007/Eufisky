@@ -32,7 +32,8 @@
 
   function renderState(message) {
     currentState = message.call_state;
-    active = ["TRUSTED_ACTIVE", "BRIDGED"].includes(currentState);
+    active = ["TRUSTED_ACTIVE", "BRIDGED", "FAMILY_CONF"].includes(currentState);
+    if (role === "family") active = Boolean(message.family_joined);
     $("#badge").textContent = message.badge || "Ready";
     $("#badge").className = `badge ${message.monitored ? "monitored" : message.badge?.startsWith("Trusted") ? "trusted" : "neutral"}`;
     const hangup = $("#hangup");
@@ -42,9 +43,16 @@
       if (currentState === "SCREENING") setCopy("Eufisky is answering", "A brief screening message is playing.");
       else if (currentState === "DIALING_SENIOR" || currentState === "RINGING_SENIOR") setCopy("Ringing Margaret…", "Waiting for Margaret to answer.");
       else if (currentState === "INTRO") setCopy("Introducing your call…", "Eufisky is connecting the line.");
+      else if (currentState === "GUARDIAN" || currentState === "FAMILY_CONF") setCopy("Please hold", "Eufisky is speaking privately with Margaret.");
       else if (active) setCopy("Call connected", "You can speak now.");
+    } else if (currentState === "GUARDIAN") {
+      setCopy(role === "senior" ? "Eufisky is helping" : "Standing by", role === "senior" ? "The caller is safely on hold." : "Margaret is speaking privately with Eufisky.");
     } else if (active) {
-      setCopy(role === "senior" ? "Call connected" : "You joined the call", "You can speak now.");
+      setCopy(role === "senior" ? (currentState === "FAMILY_CONF" ? "Sarah is joining" : "Call connected") : "You joined the call", currentState === "FAMILY_CONF" ? "The caller remains on hold." : "You can speak now.");
+      if ($("#answer")) $("#answer").hidden = true;
+      if ($("#decline")) $("#decline").hidden = true;
+    } else if (role === "family" && !message.family_ringing) {
+      setCopy("Standing by", "Eufisky can invite you into Margaret's call.");
       if ($("#answer")) $("#answer").hidden = true;
       if ($("#decline")) $("#decline").hidden = true;
     }
@@ -64,7 +72,7 @@
     if (message.type === "state") renderState(message);
     if (message.type === "ring") {
       $("#caption").textContent = "";
-      setCopy(message.from_label, role === "family" ? "Margaret would like you to join." : "Incoming call");
+      setCopy(message.from_label, message.reason || (role === "family" ? "Margaret would like you to join." : "Incoming call"));
       $("#badge").textContent = message.trusted ? "Trusted — not monitored" : "Unknown — screened";
       $("#badge").className = `badge ${message.trusted ? "trusted" : "monitored"}`;
       if ($("#answer")) $("#answer").hidden = false;
@@ -76,7 +84,16 @@
       audio.speak(message.text);
     }
     if (message.type === "agent_caption") $("#caption").textContent = message.text;
-    if (message.type === "hold") $("#hold").hidden = !message.on;
+    if (message.type === "hold") {
+      $("#hold").hidden = !message.on;
+      if (role === "caller") {
+        setCopy(message.on ? "Please hold" : "Call connected", message.on ? "Eufisky is helping Margaret." : "You can speak now.");
+        audio.holdMusic(Boolean(message.on));
+      }
+    }
+    if (message.type === "tone" && message.name === "hold_music") audio.holdMusic(true);
+    if (message.type === "tone" && message.name === "hold_stop") audio.holdMusic(false);
+    if (message.type === "guardian_controls" && $("#guardian-controls")) $("#guardian-controls").hidden = !message.visible;
     if (message.type === "ended") {
       active = false; currentState = "ENDED";
       $("#caption").textContent = "";
@@ -86,7 +103,9 @@
       if ($("#hangup")) $("#hangup").disabled = true;
       if ($("#answer")) $("#answer").hidden = true;
       if ($("#decline")) $("#decline").hidden = true;
+      if ($("#guardian-controls")) $("#guardian-controls").hidden = true;
       window.speechSynthesis.cancel();
+      audio.holdMusic(false);
     }
     if (message.type === "ping") send("pong");
   });
@@ -104,6 +123,7 @@
   if ($("#answer")) $("#answer").addEventListener("click", () => send("answer"));
   if ($("#decline")) $("#decline").addEventListener("click", () => send("hangup"));
   if ($("#hangup")) $("#hangup").addEventListener("click", () => send("hangup"));
+  document.querySelectorAll("[data-guardian]").forEach((button) => button.addEventListener("click", () => send("guardian_action", { action: button.dataset.guardian })));
   $("#mic-toggle").addEventListener("click", async () => {
     try {
       if (micOn) { audio.stopMic(); micOn = false; } else { await audio.startMic(); micOn = true; }
@@ -121,5 +141,5 @@
       send("text", { text: input.value.trim() }); input.value = "";
     }
   });
-  window.addEventListener("beforeunload", () => audio.stopMic());
+  window.addEventListener("beforeunload", () => { audio.stopMic(); audio.holdMusic(false); });
 })();

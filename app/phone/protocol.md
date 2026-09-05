@@ -3,9 +3,11 @@
 Every phone connects to `/ws/phone` and first sends
 `hello{role,room,caller_phone?}`. Caller then sends `dial{}`; the senior or family
 sends `answer{}`. Any phone can send `hangup{}`, `text{text}`, `mic{on}`, or
-`dtmf{digit}`. Binary messages are 100 ms frames of signed little-endian PCM16,
+`dtmf{digit}`. Guardian controls send `guardian_action{action}` where action is
+`end`, `family`, or `continue`. Binary messages are 100 ms frames of signed little-endian PCM16,
 mono, 16 kHz. The server sends `state{call_state,badge,monitored}`,
-`ring{from_label,trusted}`, `agent_say{text,agent}`, `hold{on}`, `tone{name}`,
+`ring{from_label,trusted,reason?}`, `agent_say{text,agent}`, `hold{on}`, `tone{name}`,
+`guardian_controls{visible,family_name?,fallback?}`,
 `ended{reason}`, or binary PCM16. A JSON `ping` is sent every 15 seconds.
 Clients may encode an event as `{"type":"text","text":"hello"}` or the
 equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
@@ -33,12 +35,14 @@ equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
    Each source leg is also written to `<call_id>_caller.wav` or
    `<call_id>_senior.wav`. Typed speech continues to be stored as a
    transcript-equivalent segment and broadcast to the dashboard.
-4. `hold{on:true}` excludes a leg from sending and receiving. `ring_family`
-   invites the family phone; after it answers, audio is relayed among all joined
-   parties.
-5. Hangup closes both WAV files and marks the call `ENDED`.
+4. A deterministic L2 risk trigger enters `GUARDIAN`, detaches both monitoring
+   streams, and sends the caller `hold{on:true}` plus `tone{hold_music}` before
+   the private Guardian backend starts. Only the senior receives Guardian speech.
+5. `conference_family` enters `FAMILY_CONF` and rings the family with a reason.
+   Senior and family can speak privately while the caller remains held. Either
+   can explicitly resume the caller or end the call.
+6. Hangup enters `WRAPUP`, closes the agent/STT/WAV sessions, stores the final
+   risk and outcome, applies the high-risk block policy, and emits `ended`.
 
 Dashboard clients connect to `/ws/dashboard?room=` and receive the documented
-`risk`, `transcript`, `state`, `level`, `tool`, and `call` events. Phase 2
-adds speaker-labeled live `transcript`, `risk`, and `level` events without
-changing either phone message flow. Later phases add `tool` events.
+`risk`, `transcript`, `state`, `level`, `tool`, `guardian`, and `call` events.

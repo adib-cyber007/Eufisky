@@ -46,6 +46,12 @@ class FakeSTT:
         return item
 
 
+class SlowCloseSTT(FakeSTT):
+    async def close(self) -> None:
+        await asyncio.sleep(0.6)
+        await super().close()
+
+
 class FakeSocket:
     def __init__(self) -> None:
         self.json: list[dict] = []
@@ -201,6 +207,9 @@ async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
     assert stored is not None and stored["peak_risk"] >= 65
     assert samples and max(sample["score"] for sample in samples) >= 65
     assert 1 in levels and 2 in levels
+    assert call.state == CallState.GUARDIAN
+    assert {"type": "hold", "on": True} in sockets["caller"].json
+    assert not any(message.get("agent") == "guardian" for message in sockets["caller"].json)
     assert sum(
         message == {"type": "tone", "name": "chime"}
         for message in sockets["senior"].json
@@ -208,6 +217,94 @@ async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
     assert [segment["speaker"] for segment in db.list_segments(call.id)] == [
         "caller", "caller", "caller", "senior"
     ]
+    await controller.hangup("demo")
+
+
+@pytest.mark.asyncio
+async def test_guardian_family_private_bridge_and_resume(call_setup) -> None:
+    controller, sockets = call_setup
+    call = await screen_and_answer(controller)
+    await controller.text("demo", "caller", "This is Medicare. Your benefits are suspended unless you verify")
+    await controller.text("demo", "caller", "Read me your card number")
+    assert call.state == CallState.GUARDIAN
+    await controller.guardian_action("demo", "senior", "family")
+    assert call.state == CallState.FAMILY_CONF and call.family_ringing
+    await controller.answer("demo", "family")
+    frame = b"\x01\x00" * 160
+    await controller.relay("demo", "senior", frame)
+    assert sockets["family"].audio[-1] == frame
+    assert sockets["caller"].audio == []
+    await controller.guardian_action("demo", "family", "continue")
+    assert call.state == CallState.BRIDGED
+    assert {"type": "hold", "on": False} in sockets["caller"].json
+    await controller.hangup("demo")
+
+
+@pytest.mark.asyncio
+async def test_guardian_fallback_controls_and_end_blocks_number(call_setup, monkeypatch) -> None:
+    monkeypatch.setenv("SIMULATE_AGENT_FAIL", "1")
+    controller, sockets = call_setup
+    call = await screen_and_answer(controller)
+    await controller.text("demo", "caller", "This is Medicare. Your benefits are suspended unless you verify")
+    await controller.text("demo", "caller", "Read me your card number")
+    controls = [item for item in sockets["senior"].json if item.get("type") == "guardian_controls"]
+    assert controls and controls[-1]["fallback"] is True
+    assert await controller.guardian_action("demo", "senior", "end") is True
+    assert call.state == CallState.ENDED
+    stored = db.get_call(call.id)
+    assert stored and stored["final_state"] == "WRAPUP" and stored["guardian_outcome"] == "end_call"
+    assert db.classify_phone("demo", "+15550199321")[0] == "blocked"
+
+
+@pytest.mark.asyncio
+async def test_peak_risk_auto_blocks_on_caller_hangup(call_setup) -> None:
+    controller, _ = call_setup
+    call = await screen_and_answer(controller)
+    db.add_risk_sample(call.id, call.elapsed_ms, 90, ["authority_impersonation"])
+    await controller.hangup("demo", "caller hung up")
+    assert db.classify_phone("demo", "+15550199321")[0] == "blocked"
+
+
+@pytest.mark.asyncio
+async def test_guardian_hold_does_not_wait_for_stt_shutdown(call_setup) -> None:
+    controller, sockets = call_setup
+    call = await controller.dial("demo", "+15550199321")
+    await controller.text("demo", "caller", "My name is Pat, calling about a delivery")
+    controller.stt_factory = SlowCloseSTT
+    await controller.answer("demo", "senior")
+    assert call.state == CallState.BRIDGED
+    await controller.text("demo", "caller", "This is Medicare. Your benefits are suspended unless you verify")
+    started = time.perf_counter()
+    await controller.text("demo", "caller", "Read me your card number")
+    assert time.perf_counter() - started < 0.5
+    assert call.state == CallState.GUARDIAN
+    assert {"type": "hold", "on": True} in sockets["caller"].json
+    await controller.hangup("demo")
+
+
+@pytest.mark.asyncio
+async def test_add_to_trusted_resumes_but_high_risk_requires_review(call_setup) -> None:
+    controller, _ = call_setup
+    call = await screen_and_answer(controller)
+    await controller.text("demo", "caller", "This is Medicare. Your benefits are suspended unless you verify")
+    await controller.text("demo", "caller", "Read me your card number")
+    assert call.state == CallState.GUARDIAN
+    await controller.text("demo", "senior", "I know this person. Trust them.")
+    contact = next(item for item in db.list_contacts("demo") if item["phone"] == "+15550199321")
+    assert call.state == CallState.BRIDGED and contact["status"] == "trusted"
+    await controller.hangup("demo")
+
+
+@pytest.mark.asyncio
+async def test_add_to_trusted_is_pending_at_peak_85(call_setup) -> None:
+    controller, _ = call_setup
+    call = await screen_and_answer(controller)
+    await controller.text("demo", "caller", "This is Medicare. Your benefits are suspended unless you verify")
+    await controller.text("demo", "caller", "Read me your card number")
+    db.add_risk_sample(call.id, call.elapsed_ms, 85, ["pii_request"])
+    await controller.text("demo", "senior", "I know this person. Trust them.")
+    contact = next(item for item in db.list_contacts("demo") if item["phone"] == "+15550199321")
+    assert call.state == CallState.BRIDGED and contact["status"] == "pending"
     await controller.hangup("demo")
 
 

@@ -1,1 +1,5 @@
-"""Post-call transcription and summarization will be implemented later."""
+"""Phase-5 post-call hook; intentionally a no-op during Guardian work."""
+
+
+def enqueue(call_id: str) -> None:
+    del call_id

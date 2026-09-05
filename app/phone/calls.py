@@ -13,13 +13,16 @@ from typing import Any
 from app import db
 from app.agent import make_backend
 from app.agent.frontdoor import FrontDoorSession
+from app.agent.guardian import GuardianSession
 from app.agent.policies import decide
 from app.audio import WavWriter
+from app.config import settings
 from app.rules.loader import load_lexicon
 from app.rooms import LiveRoom, RoomRegistry, rooms
-from app.session.context import CallMonitor
+from app.session.context import CallMonitor, guardian_context
 from app.session.events import EventPublisher
 from app.stt.assemblyai_stream import STTStream
+from app.postcall import pipeline as postcall
 
 RECORDINGS_DIR = Path(__file__).resolve().parents[2] / "data" / "recordings"
 
@@ -32,6 +35,9 @@ class CallState(str, Enum):
     DIALING_SENIOR = "DIALING_SENIOR"
     INTRO = "INTRO"
     BRIDGED = "BRIDGED"
+    GUARDIAN = "GUARDIAN"
+    FAMILY_CONF = "FAMILY_CONF"
+    WRAPUP = "WRAPUP"
     ENDED = "ENDED"
 
 
@@ -53,9 +59,15 @@ class CallSession:
         self.publisher = EventPublisher(self.id, room)
         self.monitor: CallMonitor | None = None
         self.frontdoor: FrontDoorSession | None = None
+        self.guardian: GuardianSession | None = None
+        self.guardian_outcome = ""
+        self.guardian_evidence: list[dict[str, Any]] = []
+        self.guardian_recommendation = "end the call or bring in family"
+        self.block_requested = False
         self.seed_score = 0
         self.caller_name = label
         self.purpose = ""
+        self.claimed_org = ""
         self.dial_timeout: asyncio.Task[None] | None = None
         if self.monitored:
             for leg in ("caller", "senior"):
@@ -108,7 +120,9 @@ class CallController:
 
     async def _send_state(self, call: CallSession, roles: tuple[str, ...] = ("caller", "senior", "family")) -> None:
         payload = {"type": "state", "call_state": call.state.value,
-                   "badge": call.badge, "monitored": call.monitored}
+                   "badge": call.badge, "monitored": call.monitored,
+                   "family_joined": call.family_joined,
+                   "family_ringing": call.family_ringing}
         await asyncio.gather(*(call.room.send_phone(role, payload) for role in roles))
 
     async def dial(self, room_name: str, caller_phone: str | None) -> CallSession:
@@ -172,6 +186,9 @@ class CallController:
             call.seed_score = score
             call.caller_name = str(decision.args["caller_name"])
             call.purpose = str(decision.args["purpose"])
+            call.claimed_org = str(decision.args.get("claimed_org") or "")
+            if not call.claimed_org and "medicare" in call.purpose.casefold():
+                call.claimed_org = "Medicare"
             if call.frontdoor:
                 await call.frontdoor.close()
             await call.room.send_phone("caller", {
@@ -246,7 +263,10 @@ class CallController:
                 await asyncio.sleep(self.intro_delay)
                 await self._transition(call, target, "intro_complete")
                 call.monitor = CallMonitor(
-                    call, self.lexicon, self.stt_factory, seed_score=call.seed_score
+                    call, self.lexicon, self.stt_factory, seed_score=call.seed_score,
+                    on_guardian=lambda update, trigger: self._start_guardian(call, update, trigger),
+                    on_action=lambda name, args: self._guardian_action(call, name, args),
+                    on_recommendation=lambda value: self._guardian_recommendation(call, value),
                 )
                 await call.monitor.start()
             else:
@@ -260,6 +280,142 @@ class CallController:
             await live.send_phone("family", {"type": "tone", "name": "connected"})
             db.add_event(call.id, call.elapsed_ms, "family", {"event": "joined"})
 
+    async def _start_guardian(self, call: CallSession, update: Any, trigger: str) -> None:
+        """Sever the public bridge before starting any Guardian network work."""
+        call.state = CallState.GUARDIAN
+        call.guardian_evidence = list(update.evidence)
+        if update.score >= 90:
+            call.guardian_recommendation = "bring in family"
+        call.held.add("caller")
+        if call.monitor is not None:
+            await call.monitor.pause_for_guardian(lambda text: self._guardian_text(call, text))
+        await call.room.send_phone("caller", {"type": "hold", "on": True})
+        await call.room.send_phone("caller", {"type": "tone", "name": "hold_music"})
+        await call.room.send_phone("senior", {
+            "type": "agent_say", "text": "One moment, Margaret.", "agent": "guardian"
+        })
+        await self._send_state(call)
+        await call.room.broadcast_dashboard({
+            "type": "guardian", "call_id": call.id, "t_ms": call.elapsed_ms,
+            "state": "GUARDIAN", "trigger": trigger, "recommendation": call.guardian_recommendation,
+        })
+        context = guardian_context(
+            call.guardian_evidence, caller_name=call.caller_name,
+            claim=call.claimed_org or call.purpose or call.caller_name,
+            senior_name=settings.senior_name, family_name=settings.family_name,
+            recommendation=call.guardian_recommendation,
+        )
+        call.guardian = GuardianSession(
+            call, self.backend_factory(), context,
+            lambda event: self._guardian_tool(call, event),
+        )
+        await call.guardian.start()
+        if call.monitor is not None:
+            await call.monitor.start_guardian_listening()
+
+    async def _guardian_recommendation(self, call: CallSession, value: str) -> None:
+        call.guardian_recommendation = value
+        if call.guardian is not None:
+            call.guardian.context["recommendation"] = value
+        await call.room.broadcast_dashboard({
+            "type": "guardian", "call_id": call.id, "t_ms": call.elapsed_ms,
+            "state": call.state.value, "recommendation": value,
+        })
+
+    async def _guardian_text(self, call: CallSession, text: str) -> None:
+        if call.guardian is not None:
+            await call.guardian.on_text(text)
+
+    def _save_contact(self, call: CallSession, label: str, status: str) -> None:
+        existing = next((item for item in db.list_contacts(call.room.room) if item["phone"] == call.caller_phone), None)
+        if existing:
+            db.update_contact(call.room.room, int(existing["id"]), {"label": label, "status": status})
+        else:
+            db.create_contact(call.room.room, call.caller_phone, label, status, "guardian")
+
+    async def _guardian_action(self, call: CallSession, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        call.guardian_outcome = name
+        db.update_call(call.id, guardian_outcome=name)
+        if name == "conference_family":
+            call.family_ringing = True
+            identity = call.caller_name
+            if call.claimed_org and call.claimed_org.casefold() not in identity.casefold():
+                identity = f"{identity} from {call.claimed_org}"
+            reason = f"Eufisky paused a risky call with '{identity}'"
+            await call.room.send_phone("family", {"type": "ring", "from_label": call.caller_name, "reason": reason, "trusted": False})
+            await call.room.send_phone("family", {"type": "guardian_controls", "visible": True, "family": True})
+            db.add_event(call.id, call.elapsed_ms, "family", {"event": "ringing", "reason": reason})
+        elif name == "end_call":
+            call.block_requested = bool(args.get("block_number", True))
+        elif name == "add_to_trusted":
+            peak = int((db.get_call(call.id) or {}).get("peak_risk") or 0)
+            status = "pending" if peak >= 85 else "trusted"
+            self._save_contact(call, str(args.get("label") or call.caller_name or "Known caller"), status)
+            call.family_ringing = False
+        elif name == "resume_call":
+            call.family_ringing = False
+        return {"ok": True, "action": name}
+
+    async def _guardian_tool(self, call: CallSession, event: dict[str, Any]) -> None:
+        if call.monitor is None:
+            return
+        result = await call.monitor.machine.on_agent_event(event, call.elapsed_ms)
+        if result is None or not result.get("ok"):
+            return
+        name = str(event.get("name") or "")
+        guardian = call.guardian
+        if guardian is not None:
+            await guardian.tool_result(str(event.get("id") or ""), result)
+        reassurance = {
+            "resume_call": "All right. I will reconnect you now.",
+            "add_to_trusted": "All right. I saved that choice and will reconnect you.",
+            "conference_family": f"{settings.family_name}'s phone is ringing. You're not alone.",
+            "end_call": "You're safe. I have ended the call.",
+        }[name]
+        await call.room.send_phone("senior", {"type": "agent_say", "text": reassurance, "agent": "guardian"})
+        call.state = CallState(call.monitor.machine.state.value)
+        await self._send_state(call)
+        await call.room.broadcast_dashboard({
+            "type": "guardian", "call_id": call.id, "t_ms": call.elapsed_ms,
+            "state": call.state.value, "tool": name,
+        })
+        if name in {"resume_call", "add_to_trusted"}:
+            call.held.discard("caller")
+            call.family_ringing = False
+            await call.room.send_phone("caller", {"type": "hold", "on": False})
+            await call.room.send_phone("caller", {"type": "tone", "name": "hold_stop"})
+            await call.room.send_phone("senior", {"type": "guardian_controls", "visible": False})
+            await call.room.send_phone("family", {"type": "guardian_controls", "visible": False})
+            call.guardian = None
+            if guardian is not None:
+                await guardian.close()
+            await call.monitor.resume_monitoring()
+        elif name == "conference_family":
+            call.state = CallState.FAMILY_CONF
+            await self._send_state(call)
+            call.guardian = None
+            if guardian is not None:
+                await guardian.close()
+        elif name == "end_call":
+            if self.closing_delay:
+                await asyncio.sleep(self.closing_delay)
+            await self.hangup(call.room.room, "Guardian ended the call")
+
+    async def guardian_action(self, room_name: str, role: str, action: str) -> bool:
+        call = self.registry.get(room_name).current_call
+        if not call or not call.monitor or call.state not in {CallState.GUARDIAN, CallState.FAMILY_CONF}:
+            return False
+        mapping = {
+            "resume": ("resume_call", {}), "continue": ("resume_call", {}),
+            "family": ("conference_family", {"keep_caller_on_hold": True}),
+            "end": ("end_call", {"block_number": True}),
+        }
+        if action not in mapping:
+            return False
+        name, args = mapping[action]
+        await self._guardian_tool(call, {"type": "tool_call", "name": name, "args": args, "id": f"{role}-control"})
+        return True
+
     async def hangup(self, room_name: str, reason: str = "Call ended") -> None:
         live = self.registry.get(room_name)
         call: CallSession | None = live.current_call
@@ -269,16 +425,32 @@ class CallController:
             call.dial_timeout.cancel()
         if call.frontdoor is not None:
             await call.frontdoor.close()
+        machine_wrapped = False
         if call.monitor is not None:
+            await call.monitor.machine.on_hangup(call.elapsed_ms)
+            call.state = CallState.WRAPUP
+            machine_wrapped = True
             await call.monitor.close()
-        await self._transition(call, CallState.ENDED, reason)
+        if call.guardian is not None:
+            await call.guardian.close()
+            call.guardian = None
+        if not machine_wrapped:
+            await self._transition(call, CallState.WRAPUP, reason)
         call.close_recorders()
         ended_at = datetime.now(timezone.utc).isoformat()
-        db.update_call(call.id, ended_at=ended_at, final_state=CallState.ENDED.value)
+        peak = int((db.get_call(call.id) or {}).get("peak_risk") or 0)
+        if call.monitored and call.caller_phone and (call.block_requested or peak >= 85):
+            classification, _ = db.classify_phone(call.room.room, call.caller_phone)
+            if classification != "trusted":
+                self._save_contact(call, call.caller_name or "Blocked caller", "blocked")
+        db.update_call(call.id, ended_at=ended_at, final_state=CallState.WRAPUP.value,
+                       peak_risk=peak, guardian_outcome=call.guardian_outcome or None)
         await asyncio.gather(*(live.send_phone(role, {"type": "ended", "reason": reason})
                                for role in ("caller", "senior", "family")))
         await live.broadcast_dashboard({"type": "call", "t_ms": call.elapsed_ms, "event": "ended",
                                          "call_id": call.id, "classification": call.classification})
+        postcall.enqueue(call.id)
+        call.state = CallState.ENDED
 
     async def hold(self, room_name: str, leg: str, on: bool = True) -> None:
         live = self.registry.get(room_name)
@@ -297,8 +469,10 @@ class CallController:
     async def ring_family(self, room_name: str) -> bool:
         live = self.registry.get(room_name)
         call: CallSession | None = live.current_call
-        if not call or call.state not in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED}:
+        if not call or call.state not in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED, CallState.GUARDIAN}:
             return False
+        if call.state == CallState.GUARDIAN:
+            return await self.guardian_action(room_name, "dashboard", "family")
         call.family_ringing = True
         await live.send_phone("family", {"type": "ring", "from_label": "Margaret's call", "trusted": True})
         await live.send_phone("family", {"type": "state", "call_state": call.state.value,
@@ -313,7 +487,7 @@ class CallController:
             return
         if sender in call.held:
             return
-        active = call.state in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED}
+        active = call.state in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED, CallState.FAMILY_CONF}
         if call.monitored and sender in call.recorders and (active or sender == "caller"):
             call.recorders[sender].write(pcm)
         if call.state == CallState.SCREENING and sender == "caller" and call.frontdoor is not None:
@@ -324,10 +498,20 @@ class CallController:
             and sender in {"caller", "senior"}
         ):
             await call.monitor.feed_audio(sender, pcm)
+        if call.state == CallState.GUARDIAN and sender == "senior":
+            if call.monitor is not None:
+                await call.monitor.feed_audio("senior", pcm)
+            if call.guardian is not None:
+                await call.guardian.on_audio(pcm)
         if not active:
             return
         targets: list[str] = []
-        if sender == "caller":
+        if call.state == CallState.FAMILY_CONF:
+            if sender == "senior" and call.family_joined:
+                targets = ["family"]
+            elif sender == "family" and call.family_joined:
+                targets = ["senior"]
+        elif sender == "caller":
             targets = ["senior"] + (["family"] if call.family_joined else [])
         elif sender == "senior":
             targets = ["caller"] + (["family"] if call.family_joined else [])
@@ -349,16 +533,23 @@ class CallController:
                 return
             elif call.state == CallState.BRIDGED and call.monitor is not None:
                 await call.monitor.inject_text(sender, text)
+            elif call.state in {CallState.GUARDIAN, CallState.FAMILY_CONF} and sender == "senior" and call.guardian is not None:
+                db.add_segment(call.id, sender, call.elapsed_ms, text, True)
+                await live.broadcast_dashboard({"type": "transcript", "call_id": call.id, "speaker": sender, "t_ms": call.elapsed_ms, "text": text, "final": True})
+                await call.guardian.on_text(text)
+                return
             else:
                 db.add_segment(call.id, sender, call.elapsed_ms, text, True)
                 await live.broadcast_dashboard({
                     "type": "transcript", "call_id": call.id, "speaker": sender,
                     "t_ms": call.elapsed_ms, "text": text, "final": True,
                 })
-        if call.state not in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED}:
+        if call.state not in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED, CallState.FAMILY_CONF}:
             return
-        targets = [role for role in ("caller", "senior", "family")
-                   if role != sender and (role != "family" or call.family_joined)]
+        if call.state == CallState.FAMILY_CONF:
+            targets = ["family"] if sender == "senior" and call.family_joined else ["senior"] if sender == "family" and call.family_joined else []
+        else:
+            targets = [role for role in ("caller", "senior", "family") if role != sender and (role != "family" or call.family_joined)]
         await asyncio.gather(*(live.send_phone(role, {"type": "agent_say", "text": text,
                                                        "agent": sender}) for role in targets))
 

@@ -92,7 +92,7 @@
     const band = score >= 90 ? "critical" : score >= 65 ? "guardian" : score >= 40 ? "nudge" : "quiet";
     $("#risk-fill").dataset.band = band;
     $("#risk-status").textContent = {
-      quiet: "Quiet", nudge: "Senior nudged", guardian: "Guardian would step in", critical: "Critical",
+      quiet: "Quiet", nudge: "Senior nudged", guardian: "Guardian stepped in", critical: "Critical",
     }[band];
 
     const chips = $("#signal-chips");
@@ -149,7 +149,10 @@
     if (message.type === "level") {
       item.className = `level-${message.level}`;
       item.innerHTML = `<time>${seconds}s</time><b>Safety level ${message.level}</b><span></span>`;
-      item.querySelector("span").textContent = message.level === 1 ? "Soft nudge sent to Margaret" : `Would fire · ${message.trigger || "risk threshold"}`;
+      item.querySelector("span").textContent = message.level === 1 ? "Soft nudge sent to Margaret" : `Triggered · ${message.trigger || "risk threshold"}`;
+    } else if (message.type === "tool") {
+      item.innerHTML = `<time>${seconds}s</time><b>Guardian action</b><span></span>`;
+      item.querySelector("span").textContent = String(message.name || "").replaceAll("_", " ");
     } else {
       item.innerHTML = `<time>${seconds}s</time><b></b><span></span>`;
       item.querySelector("b").textContent = message.to || "Call state";
@@ -172,6 +175,9 @@
     const result = await request("/calls/current/ring-family", { method: "POST" });
     addTimeline({ type: "state", t_ms: 0, to: result.ok ? "FAMILY RINGING" : "NO ACTIVE CALL", trigger: result.ok ? "Sarah was invited" : "Answer a call first" });
   });
+  $("#guardian-join").addEventListener("click", async () => {
+    await request("/calls/current/guardian/family", { method: "POST" });
+  });
 
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   const socket = new WebSocket(`${scheme}://${location.host}/ws/dashboard?room=${encodeURIComponent(room)}`);
@@ -181,7 +187,10 @@
     const message = JSON.parse(event.data);
     if (message.type === "ping") { socket.send(JSON.stringify({ type: "pong" })); return; }
     if (message.type === "call" && message.event === "started") resetLive(message.call_id);
-    if (message.type === "call") loadHistory();
+    if (message.type === "call") {
+      loadHistory();
+      if (message.event === "ended") $("#guardian-banner").hidden = true;
+    }
     if (message.type === "message") loadMessages();
     if (message.type === "state") {
       $("#live-state").textContent = message.to;
@@ -191,6 +200,13 @@
     if (message.type === "transcript") addTranscript(message);
     if (message.type === "risk") updateRisk(message);
     if (message.type === "level") addTimeline(message);
+    if (message.type === "tool") addTimeline(message);
+    if (message.type === "guardian") {
+      const active = ["GUARDIAN", "FAMILY_CONF"].includes(message.state);
+      $("#guardian-banner").hidden = !active;
+      $("#guardian-detail").textContent = message.tool ? `Guardian chose: ${message.tool.replaceAll("_", " ")}` : (message.recommendation === "bring in family" ? "Family support is recommended." : "The caller is safely on hold.");
+      $("#guardian-join").hidden = message.state === "FAMILY_CONF";
+    }
   });
   loadContacts(); loadMessages(); loadHistory();
 })();

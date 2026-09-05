@@ -42,10 +42,10 @@ class LLMBackend:
         self.tools = tools
         self.context = context
         senior = str(context.get("senior_name") or settings.senior_name)
-        greeting = (
+        greeting = str(context.get("greeting") or (
             f"Hello, you've reached {senior}'s line. "
             "May I ask who's calling and what it's regarding?"
-        )
+        ))
         self.messages.append({"role": "assistant", "content": greeting})
         await self.queue.put({"type": "say", "text": greeting})
 
@@ -152,6 +152,17 @@ class LLMBackend:
         """Keep the phone useful during provider failures; conservative by design."""
 
         self.provider = "deterministic"
+        if self.context.get("agent_role") == "guardian":
+            lower = text.casefold()
+            if any(term in lower for term in ("sarah", "family", "daughter", "unsure")):
+                await self._tool("conference_family", {"keep_caller_on_hold": True})
+            elif any(term in lower for term in ("continue", "resume", "keep talking")):
+                await self._tool("resume_call", {})
+            elif any(term in lower for term in ("trust", "i know")):
+                await self._tool("add_to_trusted", {"label": self.context.get("caller_name") or "Known caller"})
+            else:
+                await self._tool("end_call", {"block_number": True})
+            return
         self._fallback_turns.append(text.strip())
         joined = " ".join(self._fallback_turns)
         lower = joined.casefold()

@@ -11,6 +11,7 @@
       <audio id="chime" preload="auto" aria-hidden="true"></audio>
     </section>
     <section class="phone-controls"><div class="call-actions"><button id="answer" class="button call" type="button" hidden>Answer</button><button id="decline" class="button secondary" type="button" hidden>Decline</button><button id="hangup" class="button end" type="button" disabled>Hang up</button></div></section>
+    <section id="guardian-controls" class="guardian-controls" hidden><p>Eufisky paused the caller. What would you like to do?</p><div><button data-guardian="end" class="button end" type="button">End the call</button><button data-guardian="family" class="button call" type="button">Bring in Sarah</button><button data-guardian="continue" class="button secondary" type="button">Continue the call</button></div><small>Keypad: 1 end · 2 Sarah · 3 continue</small></section>
     <section class="talk-panel"><div class="meter-row"><button id="mic-toggle" class="mic-toggle" type="button" aria-pressed="false">Mic OFF</button><div class="meter" aria-label="Microphone level"><i id="meter-fill"></i></div></div><form id="text-form"><label for="text-talk">Type what you’d say</label><div class="text-send"><input id="text-talk" autocomplete="off" placeholder="Hello, who is this?"><button type="submit">Say it</button></div></form></section>
   </main>
   <script src="/static/js/audio.js"></script><script src="/static/js/phone.js"></script>

@@ -59,7 +59,9 @@ async def phone_socket(websocket: WebSocket) -> None:
         current = live.current_call
         if current and current.state != CallState.ENDED:
             await websocket.send_json({"type": "state", "call_state": current.state.value,
-                                       "badge": current.badge, "monitored": current.monitored})
+                                       "badge": current.badge, "monitored": current.monitored,
+                                       "family_joined": current.family_joined,
+                                       "family_ringing": current.family_ringing})
             if role == "senior" and current.state in {CallState.RINGING_SENIOR, CallState.DIALING_SENIOR}:
                 await websocket.send_json({"type": "ring", "from_label": current.label,
                                            "trusted": current.classification == "trusted"})
@@ -97,6 +99,11 @@ async def phone_socket(websocket: WebSocket) -> None:
                 from app import db
                 db.add_event(live.current_call.id, live.current_call.elapsed_ms, "dtmf",
                              {"role": role, "digit": str(payload.get("digit", ""))[:1]})
+                digit = str(payload.get("digit", ""))[:1]
+                if role == "senior" and digit in {"1", "2", "3"}:
+                    await calls.guardian_action(room_name, role, {"1": "end", "2": "family", "3": "continue"}[digit])
+            elif message_type == "guardian_action":
+                await calls.guardian_action(room_name, role, str(payload.get("action") or ""))
             elif message_type in {"mic", "pong", "ping"}:
                 continue
     except (WebSocketDisconnect, RuntimeError):
@@ -128,7 +135,7 @@ async def dashboard_socket(websocket: WebSocket, room_name: str) -> None:
             raw = await websocket.receive_text()
             payload = normalize_message(raw)
             message_type = payload["type"]
-            if message_type == "ring_family":
+            if message_type in {"ring_family", "conference_family"}:
                 await calls.ring_family(room_name)
             elif message_type in {"pong", "ping"}:
                 continue
