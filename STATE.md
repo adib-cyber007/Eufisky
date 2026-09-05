@@ -13,7 +13,7 @@ Phase 4 Guardian is implemented on `main`.
 
 Verification:
 
-- Full suite: `43 passed`.
+- Full suite: `44 passed`.
 - Focused rules/state/context/call tests: green. Tests cover every transition, all L2 formulas, L3 recommendation, cooldown escalation, inert non-tool LLM output, caller speech/audio isolation, fallback controls, family private bridge, end/block, auto-block, trust/pending, and slow STT shutdown timing.
 - Python compile and all three browser JavaScript syntax checks: green; `git diff --check`: green.
 - Rule immutability check: no Phase-4 diff in `app/rules/lexicon.yaml` or `app/rules/engine.py`.

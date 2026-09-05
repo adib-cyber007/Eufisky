@@ -16,6 +16,7 @@ from app.agent.llm_backend import LLMBackend
 from app.config import settings
 
 URL = "wss://agents.assemblyai.com/v1/ws"
+START_TIMEOUT = 3.0
 _END = object()
 
 
@@ -53,10 +54,19 @@ class VoiceAgentBackend:
         if not settings.assemblyai_api_key:
             await self._start_fallback()
             return
+        startup = asyncio.create_task(
+            self._start_voice(instructions, tools, context), name="voice-agent-startup"
+        )
+        done, _ = await asyncio.wait({startup}, timeout=START_TIMEOUT)
+        if not done:
+            startup.cancel()
+            asyncio.create_task(self._stop_socket(), name="voice-agent-timeout-cleanup")
+            await self._start_fallback()
+            return
         try:
-            await asyncio.wait_for(self._start_voice(instructions, tools, context), timeout=3.0)
+            startup.result()
         except Exception:
-            await self._stop_socket()
+            asyncio.create_task(self._stop_socket(), name="voice-agent-error-cleanup")
             await self._start_fallback()
 
     async def _start_voice(
@@ -104,6 +114,8 @@ class VoiceAgentBackend:
     async def _read(self) -> None:
         try:
             async for raw in self.socket:
+                if self.using_fallback:
+                    return
                 event = json.loads(raw)
                 event_type = str(event.get("type") or "")
                 if event_type == "session.ready":
@@ -269,6 +281,7 @@ class VoiceAgentBackend:
                 task.cancel()
         if self.using_fallback:
             await self.fallback.close()
+            await self._stop_socket()
             if self._fallback_pump:
                 with suppress(asyncio.CancelledError):
                     await self._fallback_pump
