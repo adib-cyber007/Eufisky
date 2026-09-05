@@ -18,20 +18,19 @@ STATE SNAPSHOT:
 |   |-- main.py
 |   `-- rooms.py
 |-- data/
+|   |-- recordings/       (runtime, gitignored)
+|   |-- eufisky.db        (runtime, gitignored)
 |   `-- seed.json
 |-- docs/
 |   |-- ASSUMPTIONS.md
+|   |-- HUMAN_TASKS.md
+|   |-- MASTER_SPEC.md
 |   `-- PROJECT_CONTEXT.md
 |-- tests/
+|   |-- test_calls.py
+|   |-- test_routing.py
 |   `-- test_smoke.py
 |-- tools/
-|   |-- fixtures/
-|   |-- generate_fixtures.py
-|   |-- probe_groq.py
-|   |-- probe_lemur.py
-|   |-- probe_realtime_stt.py
-|   |-- probe_utils.py
-|   `-- probe_voice_agent.py
 |-- .env.example
 |-- .gitignore
 |-- README.md
@@ -41,19 +40,28 @@ STATE SNAPSHOT:
 
 (b) What works end-to-end
 
-- Python 3.12.10 virtual environment with exact top-level dependency pins.
-- FastAPI serves the Eufisky page at `/` and `{"ok":true}` at `/api/health`.
-- Windows System.Speech generates both eight-second PCM16 mono 16 kHz fixtures.
-- Two concurrent AssemblyAI Universal Streaming sessions return caller and senior transcripts.
-- AssemblyAI Voice Agent accepts live audio, returns transcripts and audio, accepts a text-only turn, and calls `take_message`.
-- Batch transcription accepts stereo multichannel audio, all requested PII policies, WAV audio redaction, entity detection, and sentiment analysis; LLM Gateway returns the required incident JSON.
-- Smoke tests pass: 2 passed.
-- Git `main` is published to `https://github.com/adib-cyber007/Eufisky.git` and tracks `origin/main`.
+- One FastAPI app serves the room picker, Caller phone, Margaret's phone, Sarah's family phone, and Family Dashboard.
+- `POST /api/rooms/new` creates an isolated room. Every new room receives the two seed contacts: Sarah (daughter) and Walgreens Pharmacy.
+- SQLite creates every table documented in `docs/PROJECT_CONTEXT.md` idempotently, plus a durable room marker that prevents deleted seed contacts from reappearing, and provides helpers for contacts, calls, events, transcript segments, and messages.
+- Caller ID classification is deterministic: blocked wins over trusted, then unknown; withheld and empty caller IDs are unknown.
+- Trusted calls ring Margaret immediately, show `Trusted — not monitored`, bridge PCM16 directly between phones, and create no WAV path, recording, transcript segment, or dashboard transcript.
+- Unknown calls play `Eufisky screening will run here in the next phase`, then ring Margaret, show monitored status, capture caller PCM and typed speech from screening onward without leaking it to Margaret before answer, bridge answered-call PCM, and record caller/senior legs as separate WAV files.
+- Family ringing and conference join work from the temporary Dashboard `Ring Sarah's phone` button.
+- Hold excludes a leg from sending and receiving audio. Phone disconnects end active calls cleanly.
+- Browser audio uses `getUserMedia`, AudioWorklet with ScriptProcessor fallback, 16 kHz PCM16 100 ms frames, queued playback, speech synthesis that cancels on real microphone barge-in, a live level meter, and Mic OFF by default.
+- Contacts support add, trust, block, and delete. Live shows the current call state. History lists completed and active calls.
+- Phone and dashboard WebSockets send a heartbeat every 15 seconds and dashboard call/state/transcript events are live.
+- Visual browser verification passed for trusted and unknown call flows; browser console reported no errors.
+- REST verification passed for contact create/patch/delete and call detail.
+- Verification: `9 passed` with two third-party deprecation warnings. Python compile check passed. A direct 100 ms PCM relay frame stays below the 250 ms added-latency gate.
+- Live verification covered trusted, bridged unknown, and pre-answer screening calls. The trusted detail had 0 segments and no recording paths; unknown calls stored typed segments and produced two valid WAV files. A new room seeded two contacts, and stayed empty after both were deleted and its contacts endpoint was reloaded.
 
 (c) What is stubbed/deferred
 
-- Browser phone signaling, room isolation, SQLite persistence, deterministic rules, production agent adapters, session state machine, post-call orchestration, replay mode, and the complete dashboard/three-phone UI are intentionally deferred to later phases.
-- Groq probing is deferred until optional Human task T3 provides `GROQ_API_KEY`.
+- The unknown-caller Front Door is the required temporary placeholder; the real AssemblyAI Voice Agent conversation arrives in Phase 3.
+- Live AssemblyAI per-leg STT, deterministic risk scoring, Guardian intervention, post-call processing, auto-blocking, and functional Replay Mode remain deferred to their planned phases.
+- Dashboard `risk`, `level`, and `tool` event rendering is not active yet because those producers are deferred.
+- Groq remains optional and unset because the AssemblyAI Voice Agent probe passed.
 
 (d) Environment variables in use (values hidden where secret)
 
@@ -65,34 +73,40 @@ STATE SNAPSHOT:
 - `FAMILY_NAME`: `Sarah`
 - `PORT`: `8000`
 
-(e) Run locally
+(e) Run command and URLs
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 ```
 
-Open http://localhost:8000 and http://localhost:8000/api/health.
+- Room picker: http://localhost:8000
+- Caller: http://localhost:8000/caller?room=demo
+- Margaret: http://localhost:8000/senior?room=demo
+- Sarah: http://localhost:8000/family?room=demo
+- Dashboard: http://localhost:8000/dashboard?room=demo
+- Health: http://localhost:8000/api/health
 
-(f) Probe results and backend decision
+The current Phase 2 server was left running on port 8000 after verification.
 
-- Fixture generation: PASS — Windows System.Speech used for both files; 8.0 s, PCM16 mono 16 kHz verified.
-- Realtime STT: PASS — both concurrent sessions produced text; median first-arrival word lag 834 ms (threshold: 1500 ms).
-- Voice Agent: PASS — PCM16 mono 24 kHz accepted; transcript and reply-audio events returned; text-only message accepted; `take_message` tool call returned.
-- LeMUR/post-call: PASS — current documented LLM Gateway successor returned the required five-key JSON; all requested batch options and redacted audio were accepted.
-- Groq: SKIPPED — key is empty and T3 is deferred.
-- Decision: `AGENT_BACKEND=voice_agent`.
+(f) Decisions/defaults chosen
 
-(g) Decisions/defaults chosen
-
-- Used the shared workspace `C:\Users\moham\Documents\ChatGPT\Eufisky` as the repository root so all work stays in the owner-visible project folder.
-- Used current official AssemblyAI APIs: v3 Universal Streaming with `universal-3-5-pro`, inline Voice Agent sessions, and LLM Gateway as the documented LeMUR successor.
-- Kept phone/browser audio at the specified 16 kHz; resampled only the Voice Agent probe input in memory to its required 24 kHz.
-- Kept Groq and Gemini unset because Voice Agent passed and no fallback key is required in Phase 0.
-- Goal execution elapsed time: about 43 minutes.
+- Kept all Phase 0 probes and architecture stubs intact; this phase extends only the phone system surfaces.
+- Used synchronous stdlib SQLite helpers for short local operations and in-memory room objects for live sockets/call state.
+- Opened unknown-call WAVs at call start so even type-only monitored demos produce valid WAV containers; PCM frames fill them when the mic is on.
+- Reused `agent_say` for audible type-to-talk delivery, with `agent` naming the speaking phone role.
+- Accepts both `{"type":"event",...}` and the documented `{"event":{...}}` WebSocket JSON envelopes.
+- Added a small temporary REST action for the Dashboard family-ring button while keeping the documented phone/dashboard protocols intact.
+- Used a calm household-handset visual language with large controls, strong contrast, and responsive layouts rather than a generic card dashboard.
+- Repaired the laptop's registered Python 3.12.10 installation because the existing `.venv` launcher target had gone missing. The same virtual environment works again.
+- Preserved the owner's unrelated untracked `STATE_after_phase0.txt` file and did not include it in the Phase 2 commit.
 
 HUMAN ACTIONS REQUIRED NOW:
 
-None.
+1. Keep the current server window running, then open http://localhost:8000/caller?room=demo and http://localhost:8000/senior?room=demo in separate tabs.
+2. In Caller, leave `Sarah — trusted` selected, click `Dial Margaret`, switch to Margaret, and click `Answer`.
+3. In Caller only, click `Mic OFF` so it changes to `Mic ON`, allow microphone access if the browser asks, then speak. Expected: your voice plays from Margaret's tab and both tabs show `Trusted — not monitored`. Keep Margaret's mic OFF to avoid feedback.
+4. Hang up, choose `Unknown caller` in Caller, and click `Dial Margaret`. Expected: the Caller tab speaks and captions `Eufisky screening will run here in the next phase`; Margaret sees `Unknown — screened`.
+5. Open http://localhost:8000/dashboard?room=demo and choose History. Expected: both calls appear; the trusted call has no audio/transcript, while the unknown call creates WAV files under `data/recordings` when audio is sent.
 
 BLOCKERS:
 

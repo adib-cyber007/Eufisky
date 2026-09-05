@@ -6,3 +6,4 @@ tools/fixtures/stereo_30s.wav
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-tmp/

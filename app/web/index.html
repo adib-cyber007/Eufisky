@@ -6,12 +6,26 @@
     <title>Eufisky</title>
     <link rel="stylesheet" href="/static/css/app.css">
   </head>
-  <body>
-    <main>
-      <p class="eyebrow">Phase 0</p>
-      <h1>Eufisky</h1>
-      <p>A calm, protective voice layer for Margaret's phone line.</p>
-      <p class="status"><span aria-hidden="true"></span> Runnable skeleton ready</p>
+  <body class="lobby">
+    <main class="lobby-shell">
+      <section class="lobby-intro">
+        <div class="mark" aria-hidden="true">E</div>
+        <h1>Margaret’s phone room</h1>
+        <p>Open each phone in its own tab. Eufisky quietly checks unfamiliar callers while trusted people ring straight through.</p>
+      </section>
+      <section class="room-panel" aria-labelledby="room-title">
+        <h2 id="room-title">Room</h2>
+        <div class="room-code"><label for="room">Room name</label><input id="room" value="demo" autocomplete="off"></div>
+        <div class="room-links">
+          <a data-page="caller" href="/caller?room=demo"><span>Caller</span><small>Place a call</small></a>
+          <a data-page="senior" href="/senior?room=demo"><span>Margaret</span><small>Answer the phone</small></a>
+          <a data-page="family" href="/family?room=demo"><span>Sarah</span><small>Join when invited</small></a>
+          <a data-page="dashboard" href="/dashboard?room=demo"><span>Dashboard</span><small>Contacts and history</small></a>
+        </div>
+        <button id="new-room" class="button secondary" type="button">Make a new room</button>
+        <p id="room-note" class="assistive-status" aria-live="polite">The demo room is ready.</p>
+      </section>
     </main>
+    <script src="/static/js/index.js" defer></script>
   </body>
 </html>

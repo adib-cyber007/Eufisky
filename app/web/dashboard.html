@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Family dashboard — Eufisky</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<body class="dashboard-page">
+  <main class="dashboard-shell">
+    <header class="dashboard-header"><div><a class="back-link" href="/">Eufisky</a><h1>Family dashboard</h1><p>Margaret’s protected line · room <b data-room>demo</b></p></div><span id="connection" class="connection">Connecting…</span></header>
+    <nav class="tabs" aria-label="Dashboard sections"><button class="active" data-tab="live">Live</button><button data-tab="contacts">Contacts</button><button data-tab="history">History</button></nav>
+    <section id="panel-live" class="tab-panel active"><div class="live-state"><p>Current line state</p><strong id="live-state">IDLE</strong><span id="live-classification">No call in progress</span></div><button id="ring-family" class="button secondary" type="button">Ring Sarah’s phone</button><div class="transcript-panel"><h2>Live activity</h2><div id="live-feed" class="empty">Unknown-call activity will appear here. Trusted calls stay private.</div></div></section>
+    <section id="panel-contacts" class="tab-panel"><div class="section-heading"><div><h2>Contacts</h2><p>Trusted people always ring through without monitoring.</p></div></div><form id="contact-form" class="contact-form"><input id="contact-label" required placeholder="Name or business"><input id="contact-phone" required type="tel" placeholder="Phone number"><select id="contact-status"><option value="trusted">Trusted</option><option value="blocked">Blocked</option><option value="pending">Pending</option></select><button class="button call" type="submit">Add contact</button></form><div id="contact-list" class="data-list"></div></section>
+    <section id="panel-history" class="tab-panel"><div class="section-heading"><div><h2>Call history</h2><p>Trusted calls show routing only. Their words and audio are never saved.</p></div><button id="refresh-history" class="button secondary" type="button">Refresh</button></div><div id="history-list" class="data-list"></div></section>
+  </main>
+  <script src="/static/js/dashboard.js"></script>
+</body></html>

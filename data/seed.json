@@ -1,3 +1,16 @@
 {
-  "contacts": []
+  "contacts": [
+    {
+      "phone": "+15550100101",
+      "label": "Sarah (daughter)",
+      "status": "trusted",
+      "source": "seed"
+    },
+    {
+      "phone": "+15550100102",
+      "label": "Walgreens Pharmacy",
+      "status": "trusted",
+      "source": "seed"
+    }
+  ]
 }
