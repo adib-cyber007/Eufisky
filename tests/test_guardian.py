@@ -34,6 +34,14 @@ class OutputBackend:
     async def close(self): self.closed = True
 
 
+class FailedBackend(OutputBackend):
+    async def start(self, instructions, tools, context):
+        raise RuntimeError("provider unavailable")
+
+    async def close(self):
+        await asyncio.sleep(10)
+
+
 @pytest.mark.asyncio
 async def test_guardian_speech_and_audio_are_senior_only() -> None:
     room = Room()
@@ -51,3 +59,20 @@ async def test_guardian_speech_and_audio_are_senior_only() -> None:
     assert room.audio["senior"] == [b"private-audio"]
     assert room.json["caller"] == [] and room.audio["caller"] == []
     await session.close()
+
+
+@pytest.mark.asyncio
+async def test_fallback_does_not_wait_for_remote_cleanup() -> None:
+    room = Room()
+    call = SimpleNamespace(id="fallback", room=room, caller_name="Michael")
+    context = {
+        "senior_name": "Margaret", "family_name": "Sarah", "caller_name": "Michael",
+        "claim": "Medicare", "trigger_plain": "asked for your card number",
+        "requests": "personal numbers", "disclosed": "none", "family_role": "daughter",
+        "recommendation": "bring in family",
+    }
+    session = GuardianSession(call, FailedBackend(), context, lambda event: None)
+    started = asyncio.get_running_loop().time()
+    await session.start()
+    assert asyncio.get_running_loop().time() - started < 0.2
+    assert any(item.get("fallback") is True for item in room.json["senior"])

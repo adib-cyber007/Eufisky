@@ -13,7 +13,7 @@ Phase 4 Guardian is implemented on `main`.
 
 Verification:
 
-- Full suite: `42 passed`.
+- Full suite: `43 passed`.
 - Focused rules/state/context/call tests: green. Tests cover every transition, all L2 formulas, L3 recommendation, cooldown escalation, inert non-tool LLM output, caller speech/audio isolation, fallback controls, family private bridge, end/block, auto-block, trust/pending, and slow STT shutdown timing.
 - Python compile and all three browser JavaScript syntax checks: green; `git diff --check`: green.
 - Rule immutability check: no Phase-4 diff in `app/rules/lexicon.yaml` or `app/rules/engine.py`.
@@ -35,8 +35,8 @@ Open `/caller?room=demo`, `/senior?room=demo`, `/family?room=demo`, and `/dashbo
 
 # HUMAN ACTIONS REQUIRED NOW
 
-Approve one restart of the existing local Eufisky server on port 8000. Expected result: the already-open local tabs load the committed Phase 4 Guardian implementation. No code or configuration input is needed.
+None.
 
 # BLOCKERS
 
-The host denied stopping the existing pre-Phase-4 port-8000 process because its approval reviewer is still applying the prior lexicon-only scope. Phase 4 itself is implemented and independently verified on fresh local server processes; only refreshing the long-running port-8000 process remains.
+None. The Phase 4 source is pushed and the local server is running on port 8000.

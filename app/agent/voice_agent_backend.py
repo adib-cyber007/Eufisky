@@ -252,7 +252,7 @@ class VoiceAgentBackend:
                 await self.reader
         if self.socket:
             with suppress(Exception):
-                await self.socket.close()
+                await asyncio.wait_for(self.socket.close(), timeout=1.0)
         self.reader = None
         self.socket = None
 

@@ -32,10 +32,14 @@ class GuardianSession:
             self.task = asyncio.create_task(self._consume(), name=f"guardian-{self.call.id}")
         except Exception:
             self.fallback = True
-            with contextlib.suppress(Exception):
-                await self.backend.close()
+            # Remote socket cleanup must never delay Margaret's fallback script.
+            asyncio.create_task(self._close_backend(), name=f"guardian-cleanup-{self.call.id}")
             await self.call.room.send_phone("senior", {"type": "agent_say", "text": self.greeting, "agent": "guardian"})
         await self.call.room.send_phone("senior", {"type": "guardian_controls", "visible": True, "family_name": self.context["family_name"], "fallback": self.fallback})
+
+    async def _close_backend(self) -> None:
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(self.backend.close(), timeout=1.0)
 
     async def _consume(self) -> None:
         try:
