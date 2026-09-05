@@ -1,0 +1,1 @@
+"""Call-session domain model."""

@@ -1,0 +1,1 @@
+"""Deterministic scam-risk rules."""

@@ -1,0 +1,57 @@
+:root {
+  color-scheme: light;
+  font-family: Georgia, "Times New Roman", serif;
+  background: #f4efe4;
+  color: #1e342f;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at top, #fffaf0 0, #f4efe4 55%, #dfe8df 100%);
+}
+
+main {
+  width: min(36rem, calc(100% - 3rem));
+  padding: 3rem;
+  border: 1px solid #b9c6bb;
+  border-radius: 1.5rem;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: 0 1.5rem 4rem rgb(30 52 47 / 12%);
+}
+
+.eyebrow {
+  margin: 0;
+  font: 700 0.75rem/1.2 system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a5a44;
+}
+
+h1 {
+  margin: 0.35rem 0 1rem;
+  font-size: clamp(3rem, 10vw, 6rem);
+  line-height: 0.95;
+}
+
+main > p:not(.eyebrow, .status) {
+  font-size: 1.25rem;
+  line-height: 1.6;
+}
+
+.status {
+  margin-top: 2rem;
+  font: 600 0.9rem/1.4 system-ui, sans-serif;
+}
+
+.status span {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: #2f7d5b;
+  box-shadow: 0 0 0 0.25rem rgb(47 125 91 / 15%);
+}

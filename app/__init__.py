@@ -1,0 +1,1 @@
+"""Eufisky application package."""
