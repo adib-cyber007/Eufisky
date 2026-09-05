@@ -53,7 +53,10 @@ async def test_trusted_call_never_records_or_stores_segments(isolated_db: Path) 
     caller, senior = FakeSocket(), FakeSocket()
     registry.register_phone("demo", "caller", caller, "+15550100101")
     registry.register_phone("demo", "senior", senior)
-    controller = CallController(registry)
+    def forbidden_stt(*_args, **_kwargs):
+        raise AssertionError("trusted calls must never create an STT session")
+
+    controller = CallController(registry, stt_factory=forbidden_stt)
 
     call = await controller.dial("demo", "+15550100101")
     await controller.answer("demo", "senior")
@@ -68,3 +71,4 @@ async def test_trusted_call_never_records_or_stores_segments(isolated_db: Path) 
     assert stored["recording_senior"] is None
     assert db.list_segments(call.id) == []
     assert senior.audio == [b"\x00\x00" * 1600]
+    assert call.monitor is None

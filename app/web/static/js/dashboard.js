@@ -1,6 +1,9 @@
 (function () {
   const room = new URLSearchParams(location.search).get("room") || "demo";
   const $ = (selector) => document.querySelector(selector);
+  const seenTranscript = new Set();
+  let lastBubble = null;
+  let currentCallId = null;
   document.querySelectorAll("[data-room]").forEach((node) => { node.textContent = room; });
 
   document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
@@ -47,13 +50,97 @@
     calls.forEach((call) => {
       const row = document.createElement("article"); row.className = "data-row history-row";
       const date = new Date(call.started_at).toLocaleString();
-      row.innerHTML = `<div><strong></strong><span></span></div><div class="history-meta"><b></b><small></small></div>`;
+      row.innerHTML = `<div><strong></strong><span></span></div><div class="history-meta"><b></b><em></em><small></small></div>`;
       row.querySelector("strong").textContent = call.from_label || call.from_phone || "Withheld number";
       row.querySelector("span").textContent = date;
       row.querySelector("b").textContent = call.classification;
+      row.querySelector("em").textContent = call.classification === "trusted" ? "Private" : `Peak risk ${call.peak_risk || 0}`;
       row.querySelector("small").textContent = call.ended_at ? "Ended" : "In progress";
       list.append(row);
     });
+  }
+
+  function resetLive(callId) {
+    currentCallId = callId;
+    seenTranscript.clear();
+    lastBubble = null;
+    $("#live-feed").className = "transcript-stream empty";
+    $("#live-feed").textContent = "Listening for the first words…";
+    $("#timeline-list").innerHTML = '<li class="empty">Call connected. Monitoring begins after Margaret answers.</li>';
+    updateRisk({ score: 0, signals: [], evidence: [] });
+  }
+
+  function updateRisk(message) {
+    const score = Math.max(0, Math.min(100, Number(message.score) || 0));
+    $("#risk-score").textContent = Math.round(score);
+    $("#risk-fill").style.width = `${score}%`;
+    const band = score >= 90 ? "critical" : score >= 65 ? "guardian" : score >= 40 ? "nudge" : "quiet";
+    $("#risk-fill").dataset.band = band;
+    $("#risk-status").textContent = {
+      quiet: "Quiet", nudge: "Senior nudged", guardian: "Guardian would step in", critical: "Critical",
+    }[band];
+
+    const chips = $("#signal-chips");
+    chips.replaceChildren();
+    if (!(message.signals || []).length) {
+      chips.innerHTML = '<span class="signal-empty">No risk signals</span>';
+      return;
+    }
+    message.signals.forEach((signal) => {
+      const evidence = (message.evidence || []).filter((item) => item.family === signal);
+      const chip = document.createElement("span");
+      chip.className = `signal-chip ${signal === "benign" ? "benign" : ""}`;
+      chip.textContent = signal.replaceAll("_", " ");
+      chip.title = evidence.length
+        ? evidence.map((item) => `${item.speaker}: “${item.phrase}”`).join("\n")
+        : "Signal remains active while its score decays.";
+      chips.append(chip);
+    });
+  }
+
+  function addTranscript(message) {
+    const key = `${message.call_id || ""}|${message.speaker}|${message.t_ms}|${message.text}`;
+    if (seenTranscript.has(key)) return;
+    seenTranscript.add(key);
+    const feed = $("#live-feed");
+    if (feed.classList.contains("empty")) {
+      feed.replaceChildren();
+      feed.classList.remove("empty");
+    }
+    const tMs = Number(message.t_ms) || 0;
+    if (lastBubble && lastBubble.speaker === message.speaker && tMs - lastBubble.tMs <= 3000) {
+      const text = lastBubble.node.querySelector(".transcript-text");
+      text.textContent = `${text.textContent} ${message.text}`.trim();
+      lastBubble.tMs = tMs;
+      return;
+    }
+    const line = document.createElement("article");
+    line.className = `transcript-line ${message.speaker === "senior" ? "senior" : "caller"}`;
+    line.innerHTML = '<b></b><p class="transcript-text"></p><time></time>';
+    line.querySelector("b").textContent = message.speaker === "senior" ? "Margaret" : "Caller";
+    line.querySelector(".transcript-text").textContent = message.text;
+    line.querySelector("time").textContent = `${(tMs / 1000).toFixed(1)}s`;
+    feed.append(line);
+    feed.scrollTop = feed.scrollHeight;
+    lastBubble = { speaker: message.speaker, tMs, node: line };
+  }
+
+  function addTimeline(message) {
+    const list = $("#timeline-list");
+    const empty = list.querySelector(".empty");
+    if (empty) empty.remove();
+    const item = document.createElement("li");
+    const seconds = ((Number(message.t_ms) || 0) / 1000).toFixed(1);
+    if (message.type === "level") {
+      item.className = `level-${message.level}`;
+      item.innerHTML = `<time>${seconds}s</time><b>Safety level ${message.level}</b><span></span>`;
+      item.querySelector("span").textContent = message.level === 1 ? "Soft nudge sent to Margaret" : `Would fire · ${message.trigger || "risk threshold"}`;
+    } else {
+      item.innerHTML = `<time>${seconds}s</time><b></b><span></span>`;
+      item.querySelector("b").textContent = message.to || "Call state";
+      item.querySelector("span").textContent = message.trigger || "State changed";
+    }
+    list.append(item);
   }
 
   $("#contact-form").addEventListener("submit", async (event) => {
@@ -67,7 +154,7 @@
   $("#refresh-history").addEventListener("click", loadHistory);
   $("#ring-family").addEventListener("click", async () => {
     const result = await request("/calls/current/ring-family", { method: "POST" });
-    $("#live-feed").textContent = result.ok ? "Sarah’s phone is ringing." : "Start and answer a call before ringing Sarah.";
+    addTimeline({ type: "state", t_ms: 0, to: result.ok ? "FAMILY RINGING" : "NO ACTIVE CALL", trigger: result.ok ? "Sarah was invited" : "Answer a call first" });
   });
 
   const scheme = location.protocol === "https:" ? "wss" : "ws";
@@ -77,19 +164,16 @@
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(event.data);
     if (message.type === "ping") { socket.send(JSON.stringify({ type: "pong" })); return; }
+    if (message.type === "call" && message.event === "started") resetLive(message.call_id);
+    if (message.type === "call") loadHistory();
     if (message.type === "state") {
       $("#live-state").textContent = message.to;
       $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
+      addTimeline(message);
     }
-    if (message.type === "call") { loadHistory(); }
-    if (message.type === "transcript") {
-      const line = document.createElement("p");
-      line.innerHTML = `<b></b><span></span>`;
-      line.querySelector("b").textContent = `${message.speaker}: `;
-      line.querySelector("span").textContent = message.text;
-      const feed = $("#live-feed"); if (feed.classList.contains("empty")) { feed.textContent = ""; feed.classList.remove("empty"); }
-      feed.prepend(line);
-    }
+    if (message.type === "transcript") addTranscript(message);
+    if (message.type === "risk") updateRisk(message);
+    if (message.type === "level") addTimeline(message);
   });
   loadContacts(); loadHistory();
 })();

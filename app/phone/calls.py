@@ -12,7 +12,11 @@ from typing import Any
 
 from app import db
 from app.audio import WavWriter
+from app.rules.loader import load_lexicon
 from app.rooms import LiveRoom, RoomRegistry, rooms
+from app.session.context import CallMonitor
+from app.session.events import EventPublisher
+from app.stt.assemblyai_stream import STTStream
 
 RECORDINGS_DIR = Path(__file__).resolve().parents[2] / "data" / "recordings"
 PLACEHOLDER = "Eufisky screening will run here in the next phase"
@@ -42,6 +46,8 @@ class CallSession:
         self.family_joined = False
         self.recorders: dict[str, WavWriter] = {}
         self.recording_paths: dict[str, str] = {}
+        self.publisher = EventPublisher(self.id, room)
+        self.monitor: CallMonitor | None = None
         if self.monitored:
             for leg in ("caller", "senior"):
                 relative = Path("data") / "recordings" / f"{self.id}_{leg}.wav"
@@ -66,18 +72,22 @@ class CallSession:
 
 
 class CallController:
-    def __init__(self, registry: RoomRegistry = rooms) -> None:
+    def __init__(
+        self,
+        registry: RoomRegistry = rooms,
+        stt_factory: Any = STTStream,
+        lexicon: dict[str, Any] | None = None,
+    ) -> None:
         self.registry = registry
+        self.stt_factory = stt_factory
+        self.lexicon = lexicon or load_lexicon()
 
     async def _transition(self, call: CallSession, state: CallState, trigger: str) -> None:
         previous = call.state
         call.state = state
-        db.add_event(call.id, call.elapsed_ms, "state", {"from": previous.value, "to": state.value,
-                                                          "trigger": trigger})
-        await call.room.broadcast_dashboard({
-            "type": "state", "t_ms": call.elapsed_ms, "from": previous.value,
-            "to": state.value, "trigger": trigger, "call_id": call.id,
-        })
+        await call.publisher.state(
+            call.elapsed_ms, previous.value, state.value, trigger
+        )
 
     async def _send_state(self, call: CallSession, roles: tuple[str, ...] = ("caller", "senior", "family")) -> None:
         payload = {"type": "state", "call_state": call.state.value,
@@ -130,6 +140,9 @@ class CallController:
         if role == "senior" and call.state == CallState.RINGING_SENIOR:
             target = CallState.TRUSTED_ACTIVE if call.classification == "trusted" else CallState.BRIDGED
             await self._transition(call, target, "senior_answered")
+            if target == CallState.BRIDGED:
+                call.monitor = CallMonitor(call, self.lexicon, self.stt_factory)
+                await call.monitor.start()
             await self._send_state(call)
             await live.send_phone("caller", {"type": "tone", "name": "connected"})
         elif role == "family" and call.family_ringing:
@@ -144,6 +157,8 @@ class CallController:
         call: CallSession | None = live.current_call
         if not call or call.state == CallState.ENDED:
             return
+        if call.monitor is not None:
+            await call.monitor.close()
         await self._transition(call, CallState.ENDED, reason)
         call.close_recorders()
         ended_at = datetime.now(timezone.utc).isoformat()
@@ -162,6 +177,8 @@ class CallController:
             call.held.add(leg)
         else:
             call.held.discard(leg)
+        if call.monitor is not None and leg in {"caller", "senior"}:
+            await call.monitor.hold(leg, on)
         await live.send_phone(leg, {"type": "hold", "on": on})
         db.add_event(call.id, call.elapsed_ms, "hold", {"leg": leg, "on": on})
 
@@ -187,6 +204,12 @@ class CallController:
         active = call.state in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED}
         if call.monitored and sender in call.recorders and (active or sender == "caller"):
             call.recorders[sender].write(pcm)
+        if (
+            call.state == CallState.BRIDGED
+            and call.monitor is not None
+            and sender in {"caller", "senior"}
+        ):
+            await call.monitor.feed_audio(sender, pcm)
         if not active:
             return
         targets: list[str] = []
@@ -207,9 +230,14 @@ class CallController:
         if not call or call.state == CallState.ENDED:
             return
         if call.monitored:
-            db.add_segment(call.id, sender, call.elapsed_ms, text, True)
-            await live.broadcast_dashboard({"type": "transcript", "speaker": sender,
-                                             "t_ms": call.elapsed_ms, "text": text, "final": True})
+            if call.state == CallState.BRIDGED and call.monitor is not None:
+                await call.monitor.inject_text(sender, text)
+            else:
+                db.add_segment(call.id, sender, call.elapsed_ms, text, True)
+                await live.broadcast_dashboard({
+                    "type": "transcript", "call_id": call.id, "speaker": sender,
+                    "t_ms": call.elapsed_ms, "text": text, "final": True,
+                })
         if call.state not in {CallState.TRUSTED_ACTIVE, CallState.BRIDGED}:
             return
         targets = [role for role in ("caller", "senior", "family")

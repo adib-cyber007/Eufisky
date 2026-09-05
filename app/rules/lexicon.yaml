@@ -1,2 +1,221 @@
-# Scam-risk lexicon populated in a later phase.
-signals: {}
+# Deterministic US elder-scam vocabulary. Phrase matching is normalized and
+# speaker-specific; each family's contribution is capped at three active hits.
+signals:
+  authority_impersonation:
+    speaker: caller
+    weight: 20
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - medicare
+      - social security
+      - internal revenue service
+      - irs
+      - sheriff
+      - warrant
+      - fraud department
+      - federal agent
+      - your bank's fraud team
+      - police department
+      - government office
+      - treasury department
+      - court officer
+      - customs agent
+  urgency:
+    speaker: caller
+    weight: 15
+    half_life_s: 60
+    cap: 3
+    phrases:
+      - right now
+      - immediately
+      - today only
+      - suspended
+      - last chance
+      - before midnight
+      - act now
+      - urgent
+      - without delay
+      - time sensitive
+      - within the hour
+      - final notice
+      - expires today
+      - do it now
+  secrecy:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - don't tell anyone
+      - between us
+      - don't hang up
+      - stay on the line
+      - don't call your daughter
+      - keep this confidential
+      - tell nobody
+      - do not discuss this
+      - keep it secret
+      - don't contact the bank
+      - don't call the police
+      - nobody else can know
+      - do not tell family
+  payment_method:
+    speaker: caller
+    weight: 30
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - gift card
+      - green dot
+      - apple card
+      - bitcoin
+      - wire transfer
+      - zelle
+      - western union
+      - cash app
+      - money order
+      - cryptocurrency
+      - prepaid card
+      - cash deposit
+      - steam card
+      - google play card
+  pii_request:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - account number
+      - medicare number
+      - social security number
+      - date of birth
+      - pin
+      - password
+      - card number
+      - number on your card
+      - verify your identity
+      - routing number
+      - security code
+      - mother's maiden name
+      - read me the number
+      - confirm your details
+  remote_access:
+    speaker: caller
+    weight: 30
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - anydesk
+      - teamviewer
+      - download
+      - control your computer
+      - screen share
+      - install this
+      - remote desktop
+      - support application
+      - give me access
+      - open your browser
+      - click the link
+      - share your screen
+      - remote support
+  family_emergency:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - grandson
+      - granddaughter
+      - accident
+      - jail
+      - bail
+      - hospital
+      - lawyer
+      - don't tell his parents
+      - family emergency
+      - car crash
+      - arrested overseas
+      - emergency room
+      - your nephew
+      - your grandchild
+  threat:
+    speaker: caller
+    weight: 20
+    half_life_s: 90
+    cap: 3
+    phrases:
+      - arrested
+      - legal action
+      - police will come
+      - lose your benefits
+      - cut off
+      - disconnected
+      - issue a warrant
+      - seize your account
+      - face prosecution
+      - service terminated
+      - benefits canceled
+      - electricity shut off
+      - deported
+      - frozen account
+  compliance_cue:
+    speaker: senior
+    weight: 15
+    half_life_s: 60
+    cap: 3
+    phrases:
+      - let me get my purse
+      - hold on let me find
+      - my card is
+      - let me read it
+      - it says
+      - one moment i'll get it
+      - i have the card
+      - let me look
+      - i'll get my wallet
+      - here's the number
+      - i found it
+      - let me check
+      - ready to write
+      - i can pay
+  benign:
+    speaker: caller
+    weight: -20
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - appointment reminder
+      - prescription is ready
+      - calling from dr
+      - confirm your appointment
+      - this is your neighbor
+      - delivery
+      - church service
+      - lunch tomorrow
+      - family dinner
+      - insurance renewal notice
+      - pharmacy pickup
+      - package arriving
+      - community survey
+      - checking in
+
+patterns:
+  pii_disclosure:
+    speaker: senior
+    weight: 40
+    half_life_s: 300
+    cap: 3
+    regex: '(?:\b\d{4,}\b|\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)?\d{2}\b)'
+
+combos:
+  - families: [authority_impersonation, urgency, pii_request]
+    minimum: 2
+    bonus: 15
+  - families: [payment_method, urgency]
+    minimum: 2
+    bonus: 20
+  - families: [pii_disclosure, pii_request, authority_impersonation]
+    required: [pii_disclosure]
+    minimum: 2
+    bonus: 25

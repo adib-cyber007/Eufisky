@@ -1,0 +1,3 @@
+0|caller|Your electricity will be cut off case 16
+800|caller|Make payment immediately
+1700|caller|Send it by wire transfer

@@ -1,0 +1,3 @@
+0|caller|This is an appointment reminder from the pharmacy case 19
+1000|caller|Your prescription is ready for pharmacy pickup
+2000|senior|Thank you I will come tomorrow

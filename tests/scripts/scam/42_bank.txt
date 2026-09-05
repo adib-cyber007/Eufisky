@@ -1,0 +1,3 @@
+0|caller|This is your bank's fraud team case 42
+800|caller|Your account will be frozen today
+1700|caller|Verify your identity with the card number

@@ -1,0 +1,3 @@
+0|caller|This is Medicare calling about your benefits case 46
+900|caller|Your benefits will be suspended today unless we verify
+1800|caller|Read me the number on your card

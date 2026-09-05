@@ -1,0 +1,3 @@
+0|caller|I am calling from Dr Smith's office case 2
+1000|caller|Please confirm your appointment for Tuesday
+2000|senior|Tuesday afternoon is fine

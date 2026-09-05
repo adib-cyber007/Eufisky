@@ -251,6 +251,37 @@ def add_event(call_id: str, t_ms: int, event_type: str, payload: dict[str, Any])
         )
 
 
+def add_risk_sample(
+    call_id: str, t_ms: int, score: int, signals: list[str]
+) -> dict[str, Any]:
+    """Persist one live score and monotonically update the call peak."""
+
+    score = max(0, min(100, int(score)))
+    with _connect() as connection:
+        connection.execute(
+            "INSERT INTO risk_samples(call_id,t_ms,score,signals_json) VALUES (?,?,?,?)",
+            (call_id, t_ms, score, json.dumps(signals)),
+        )
+        connection.execute(
+            "UPDATE calls SET peak_risk = MAX(peak_risk, ?) WHERE id = ?",
+            (score, call_id),
+        )
+    return {"call_id": call_id, "t_ms": t_ms, "score": score, "signals": signals}
+
+
+def list_risk_samples(call_id: str) -> list[dict[str, Any]]:
+    with _connect() as connection:
+        rows = connection.execute(
+            "SELECT * FROM risk_samples WHERE call_id = ? ORDER BY t_ms", (call_id,)
+        ).fetchall()
+    samples: list[dict[str, Any]] = []
+    for row in rows:
+        sample = dict(row)
+        sample["signals"] = json.loads(sample.pop("signals_json"))
+        samples.append(sample)
+    return samples
+
+
 def add_segment(
     call_id: str, speaker: str, t_ms: int, text: str, is_final: bool = True
 ) -> dict[str, Any]:
@@ -306,5 +337,6 @@ def call_detail(room: str, call_id: str) -> dict[str, Any] | None:
     if not call:
         return None
     call["events"] = list_events(call_id)
+    call["samples"] = list_risk_samples(call_id)
     call["segments"] = list_segments(call_id)
     return call

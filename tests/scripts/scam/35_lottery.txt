@@ -1,0 +1,3 @@
+0|caller|You won a lottery prize case 35
+800|caller|This offer expires today
+1700|caller|Pay the fee with a money order
