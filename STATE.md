@@ -18,7 +18,7 @@ Verification:
 - Python compile and all three browser JavaScript syntax checks: green; `git diff --check`: green.
 - Rule immutability check: no Phase-4 diff in `app/rules/lexicon.yaml` or `app/rules/engine.py`.
 - Live four-WebSocket type-to-talk runs against fresh servers:
-  - Family flow: caller HOLD in 36 ms; reason exactly `Eufisky paused a risky call with 'Michael from Medicare'`; Sarah rang/answered; caller hangup persisted WRAPUP, peak 90, Guardian outcome `conference_family`; `+15550199321` blocked.
+  - Generic bank/card family flow: Michael connected without a Medicare claim; `fraud department`, `debit card`, `verify your account`, `credit card number`, and `CVV` raised risk from 60 to 100 and crossed L1/L2/L3; caller HOLD began in 79 ms; Sarah rang/answered; caller hangup persisted WRAPUP and Guardian outcome `conference_family`; `+15550199321` blocked.
   - Continue flow: caller HOLD in 37 ms; Margaret resumed the caller; final high-risk block persisted.
   - `SIMULATE_AGENT_FAIL=1`: caller HOLD in 37 ms; fallback controls appeared and the Continue action resumed the caller.
 - Browser surfaces are covered by static rendering tests for all required buttons/banner/hold-audio code. Direct browser automation was denied by the host's stale lexicon-only authorization guard; no product failure was observed.

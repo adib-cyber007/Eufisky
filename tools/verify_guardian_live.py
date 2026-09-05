@@ -50,15 +50,21 @@ async def verify(base_url: str, scenario: str) -> None:
         ))
 
         await send(caller, "dial")
-        await receive_json(caller, lambda item: item.get("type") == "agent_say")
-        await send(caller, "text", text="This is Michael from Medicare, calling about an urgent update to her benefits.")
+        # A live Voice Agent greets with PCM audio/captions, while the
+        # deterministic fallback emits agent_say. Either proves the Front Door
+        # is ready for the typed manual-test turn.
+        await receive_json(
+            caller,
+            lambda item: item.get("type") in {"agent_say", "agent_caption", "audio"},
+        )
+        await send(caller, "text", text="This is Michael, calling about a routine account service update.")
         ring = await receive_json(senior, lambda item: item.get("type") == "ring")
         assert "Michael" in ring.get("from_label", "")
         await send(senior, "answer")
         await receive_json(caller, lambda item: item.get("type") == "state" and item.get("call_state") == "BRIDGED")
 
-        await send(caller, "text", text="Your benefits will be suspended today unless we verify your account.")
-        await send(caller, "text", text="Please read me the number on your Medicare card.")
+        await send(caller, "text", text="This is your bank's fraud department. Your debit card may be at risk.")
+        await send(caller, "text", text="To verify your account, read me your credit card number and CVV.")
         hold_started = time.perf_counter()
         hold = await receive_json(caller, lambda item: item.get("type") == "hold" and item.get("on") is True, 5)
         hold_latency = time.perf_counter() - hold_started
