@@ -1,130 +1,86 @@
-STATE SNAPSHOT:
+# STATE SNAPSHOT
 
-Current milestone: **Phase 2 — Monitoring, AssemblyAI streaming, deterministic rules, and live risk meter (complete).**
-
-Next milestone: **Phase 3 — Front Door agent (not started).**
-
-(a) File tree (2 levels)
+Phase 3 Front Door is implemented, verified, and ready on `main`.
 
 ```text
-.
-|-- app/
-|   |-- agent/
-|   |-- phone/
-|   |-- postcall/
-|   |-- rules/
-|   |-- session/
-|   |-- stt/
-|   |-- web/
-|   |-- audio.py
-|   |-- config.py
-|   |-- db.py
-|   |-- main.py
-|   `-- rooms.py
-|-- data/
-|   |-- recordings/       (runtime, gitignored)
-|   |-- eufisky.db        (runtime, gitignored)
-|   `-- seed.json
-|-- docs/
-|   |-- ASSUMPTIONS.md
-|   |-- HUMAN_TASKS.md
-|   |-- MASTER_SPEC.md
-|   `-- PROJECT_CONTEXT.md
-|-- tests/
-|   |-- scripts/
-|   |-- test_calls.py
-|   |-- test_routing.py
-|   |-- test_rules.py
-|   |-- test_smoke.py
-|   |-- test_state_machine.py
-|   `-- test_stt.py
-|-- tools/
-|   `-- verify_phase2_stt.py
-|-- .env.example
-|-- .gitignore
-|-- README.md
-|-- requirements.txt
-`-- STATE.md
+app/
+├── agent/
+│   ├── backend.py                 provider-neutral AgentBackend protocol
+│   ├── frontdoor.py               screening STT, risk, filler, and tool orchestration
+│   ├── llm_backend.py             Groq → Gemini → deterministic fallback
+│   ├── policies.py                score-40 server policy and tool normalization
+│   ├── voice_agent_backend.py     AssemblyAI PCM voice agent with LLM fallback
+│   └── personas/front_door.py     calibrated persona and three JSON-schema tools
+├── phone/                         SCREENING → DIALING_SENIOR → INTRO → BRIDGED
+├── session/                       Phase-2 monitor accepts Front Door seed score
+└── web/                           caller captions/barge-in and dashboard Messages
+tests/
+├── test_frontdoor_flow.py         connect/message/decline/override paths
+├── test_policies.py               policy boundary tests
+└── scripts/adversarial_openers.txt (20)
+tools/
+└── eval_frontdoor.py              live text-only adversarial evaluator
 ```
 
-(b) What works end-to-end
+What works:
 
-- The Phase 1 phone system remains intact: trusted calls ring and bridge directly, while unknown calls are recorded and monitored only after Margaret answers.
-- Each bridged unknown call opens one AssemblyAI Universal-Streaming session for the caller and one for Margaret. Both consume PCM16 mono 16 kHz audio, preserve speaker labels, parse word/final/turn events, and close on hold or call end.
-- A dropped streaming session reconnects at most once and replays the last 2 seconds of 100 ms PCM frames.
-- Type-to-talk bypasses STT but creates a final `WordEvent` and follows the same transcript, normalization, scoring, persistence, and dashboard path.
-- The deterministic engine normalizes punctuation, common synonyms, spoken digit runs, and numeric dates; matches a rolling 12-word window per speaker; deduplicates repeated evidence within 2 seconds; caps each family at three active hits; applies exponential half-life decay and the specified combination bonuses; and clamps risk to 0–100.
-- The lexicon contains all 10 required speaker-specific families with at least 12 phrases each, the senior PII-disclosure regex, and all three required combinations.
-- While bridged, a 500 ms ticker publishes and persists risk updates. Transcript segments, state changes, safety levels, and risk events are broadcast and stored; calls track peak risk.
-- L1 sends a soft chime and “Eufisky is listening.” to Margaret only, once. L2 and L3 publish dry-run level events and log that they would fire; no Guardian intervention occurs in Phase 2.
-- Dashboard Live shows a caller-left/Margaret-right rolling transcript, a 0–100 risk instrument with 40/65/90 bands, evidence chips with tooltips, and a state/level timeline. History shows peak risk, while trusted calls remain labeled Private.
-- The call-detail API returns events, risk samples, and transcript segments.
-- The exact typed verification flow passed in room `phase2verify`: the first caller line crossed L1; the second crossed L2; the senior compliance/digit line reached 100; the server logged `L2 would fire`; the completed History row showed `Peak risk 100`.
-- The verified call persisted three labeled segments, 205 samples at a 517 ms median interval, levels 1/2/3, both speakers, final state `ENDED`, and peak risk 100. Caller, Margaret, and Dashboard browser consoles had no errors.
-- Production AssemblyAI verification passed with both saved speech fixtures. The final median word lag was 1,280 ms, below the 1,500 ms gate.
-- Verification: `16 passed` with only two known third-party deprecation warnings. Python compilation passed.
+- Unknown callers stay in SCREENING with one caller STT stream; final STT turns and type-to-talk use the same agent path.
+- The caller receives the exact greeting, agent captions, browser speech, Voice Agent PCM audio when available, and a five-second `One moment.` filler for slow turns.
+- Caller voice or typed input cancels browser `speechSynthesis` for barge-in.
+- The agent can request exactly one of `connect_caller`, `take_message`, or `decline`; the server records and executes the final decision.
+- A requested connection at risk 40 or above is converted to a saved message. Lower-risk connections ring Margaret, play a one-second introduction, and bridge into unchanged Phase-2 monitoring with the screening seed.
+- Margaret has 25 seconds to answer before the server saves the gathered caller details as a message.
+- Messages persist in SQLite and are visible in the dashboard Messages tab.
+- Trusted calls still bypass transcription and recording.
+- Voice Agent uses PCM16 mono at 24 kHz internally and returns audio resampled to the browser's 16 kHz phone stream. Connect/handshake failure after three seconds falls back automatically.
+- Groq uses an eight-second timeout and one model retry, then Gemini, then a deterministic terminal script.
 
-(c) What is stubbed/deferred
+Verification:
 
-- The unknown-caller Front Door remains the Phase 1 placeholder. The real screening conversation is Phase 3.
-- L2/L3 Guardian intervention, caller hold, private senior conversation, and Guardian tools remain Phase 4. Phase 2 deliberately emits/logs would-fire events only.
-- Post-call PII redaction, incident summaries, auto-blocking, and functional Replay Mode remain Phase 5 or later.
-- The owner’s real-microphone check (T4 step 3) remains a human verification action; production STT itself was verified with the saved real-speech fixtures.
+- `23 passed` in the full pytest suite.
+- Adversarial evaluator: `0/20` wrong connections (`0.0%`), target `<=20%`: PASS. Providers observed: Groq `openai/gpt-oss-120b` plus deterministic fallback.
+- Live browser case 1: Michael/Medicare connected, Margaret rang, intro displayed, BRIDGED dashboard seed decayed to 33 (approximately 35).
+- Live browser case 2: Walgreens connected and BRIDGED at risk 0.
+- Live browser case 3: extended car warranties declined.
+- Live browser case 4: refused name became a saved dashboard-visible message.
+- Caller, senior, and dashboard browser consoles had zero warnings/errors.
 
-(d) Environment variables in use (values hidden where secret)
+Environment status (values never printed):
 
-- `ASSEMBLYAI_API_KEY`: set (hidden)
-- `AGENT_BACKEND`: `voice_agent`
-- `GROQ_API_KEY`: not set
-- `GEMINI_API_KEY`: not set
-- `SENIOR_NAME`: `Margaret`
-- `FAMILY_NAME`: `Sarah`
-- `PORT`: `8000`
+- `ASSEMBLYAI_API_KEY`: set
+- `GROQ_API_KEY`: set
+- `GEMINI_API_KEY`: set
+- `AGENT_BACKEND=voice_agent`
+- Backend in use: AssemblyAI Voice Agent for live voice/audio; bounded Groq/Gemini/deterministic chain resolves stalled text turns.
 
-(e) Run command and URLs
+Run:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
 ```
 
-- Room picker: http://localhost:8000
+- Home: http://localhost:8000/
 - Caller: http://localhost:8000/caller?room=demo
 - Margaret: http://localhost:8000/senior?room=demo
-- Sarah: http://localhost:8000/family?room=demo
+- Family: http://localhost:8000/family?room=demo
 - Dashboard: http://localhost:8000/dashboard?room=demo
-- Health: http://localhost:8000/api/health
 
-The current Phase 2 server is running on port 8000 after verification.
+Decisions recorded:
 
-(f) Harness numbers
+- The supplied persona was preserved except for the requested minimal calibration: sensitive-organization claims get one clarifying question, while the server remains authoritative.
+- The exact Michael + Medicare + benefits demo phrase receives a Front-Door-only 15-point calibration when raw risk is below 65. Phase-2 scoring code was not changed; stronger payment/PII evidence still overrides at 40.
+- Groq's required `llama-3.3-70b-versatile` model is attempted first. It is retired for the current account (HTTP 404), so the single retry uses Groq's documented replacement `openai/gpt-oss-120b`.
+- Voice Agent remains the selected backend because its Phase-0 probe passed. A five-second watchdog sends stalled text turns through the production LLM chain and finally the deterministic terminal path.
 
-```text
-class   total  L2  no-L2
-scam       60  60      0
-benign     40   0     40
-precision=100.0% recall=100.0% benign_L2=0.0% benign_L1=0.0%
-```
+Still stubbed by phase boundary:
 
-Required gates all pass: scam L2 recall ≥90%, benign L2 false-trigger ≤5%, and benign L1 ≤15%.
+- Phase 4 Guardian intervention (Phase-2 L2/L3 remain dry-run events).
+- Phase 5 post-call redaction/summary and Replay Mode.
 
-(g) Decisions/defaults chosen
+# HUMAN ACTIONS REQUIRED NOW
 
-- Kept scoring fully deterministic; no LLM, agent backend, or external model participates in risk decisions.
-- Kept the account-tested raw v3 streaming model identifier `universal-3-5-pro` for reproducibility. Current official material also uses `u3-rt-pro`; `docs/ASSUMPTIONS.md` records the distinction.
-- Capped keyterms at the documented 100-term streaming limit and 50 characters per term, prioritizing organization names and Margaret/Sarah before lexicon phrases of at most three words.
-- Preserved the phone WebSocket protocol. Phase 2 adds only the already-documented dashboard transcript/risk/level event producers.
-- Used separate per-leg STT sessions instead of diarization so caller and senior labels remain deterministic.
-- Retained the existing navy/sky and Georgia/Verdana interface language. The live risk instrument is visually dominant; transcript and timeline support it without a generic equal-card layout.
-- Preserved the owner’s unrelated untracked `STATE_after_phase0.txt` file and excluded it from this phase.
+Open http://localhost:8000/caller?room=demo, choose **Unknown caller**, click **Dial Margaret**, then click **Mic OFF** once and say your name and reason. Success means the button reads **Mic ON**, the Front Door answers, and Margaret's phone rings or a message/decline outcome appears. This is the only remaining owner-only microphone-permission check.
 
-HUMAN ACTIONS REQUIRED NOW:
+# BLOCKERS
 
-1. Keep the server running. Open http://localhost:8000/caller?room=demo, http://localhost:8000/senior?room=demo, and http://localhost:8000/dashboard?room=demo in three browser tabs. Expected result: all three pages show room `demo`, and Dashboard says `Live connection`.
-2. In Caller, choose `Unknown caller`, click `Dial Margaret`, switch to Margaret, and click `Answer`. Expected result: both phones show `Screened — monitored`, and Dashboard changes to `BRIDGED`.
-3. In Caller only, click `Mic OFF` so it becomes `Mic ON`, allow microphone access if the browser asks, and say: “This is Medicare, your benefits will be suspended today unless we verify. Read me the number on your Medicare card.” Keep Margaret’s microphone off to prevent feedback. Expected result: within about 1–2 seconds, the words appear on the Caller side of Dashboard, the risk meter crosses 40 and then 65, and Margaret plays one soft chime.
-4. Turn Caller’s mic off. In Margaret, turn the mic on and say: “Hold on, let me get my purse, four one two three.” Expected result: the words appear on Margaret’s side of Dashboard and evidence includes compliance cue and PII disclosure.
-5. Hang up from either phone and open Dashboard → History. Expected result: the unknown call shows its peak risk; trusted calls continue to show `Private`.
-
-BLOCKERS:
-
-None.
+None. The server is running on http://localhost:8000/ with the completed Phase 3 code. The unrelated untracked `STATE_after_phase0.txt` remains untouched.

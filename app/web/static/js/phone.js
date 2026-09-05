@@ -40,7 +40,8 @@
     if (role === "caller") {
       $("#dial").disabled = currentState !== "IDLE" && currentState !== "ENDED";
       if (currentState === "SCREENING") setCopy("Eufisky is answering", "A brief screening message is playing.");
-      else if (currentState === "RINGING_SENIOR") setCopy("Ringing Margaret…", "Waiting for Margaret to answer.");
+      else if (currentState === "DIALING_SENIOR" || currentState === "RINGING_SENIOR") setCopy("Ringing Margaret…", "Waiting for Margaret to answer.");
+      else if (currentState === "INTRO") setCopy("Introducing your call…", "Eufisky is connecting the line.");
       else if (active) setCopy("Call connected", "You can speak now.");
     } else if (active) {
       setCopy(role === "senior" ? "Call connected" : "You joined the call", "You can speak now.");
@@ -74,6 +75,7 @@
       $("#caption").textContent = message.text;
       audio.speak(message.text);
     }
+    if (message.type === "agent_caption") $("#caption").textContent = message.text;
     if (message.type === "hold") $("#hold").hidden = !message.on;
     if (message.type === "ended") {
       active = false; currentState = "ENDED";
@@ -114,7 +116,10 @@
   $("#text-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const input = $("#text-talk");
-    if (input.value.trim()) { send("text", { text: input.value.trim() }); input.value = ""; }
+    if (input.value.trim()) {
+      window.speechSynthesis.cancel();
+      send("text", { text: input.value.trim() }); input.value = "";
+    }
   });
   window.addEventListener("beforeunload", () => audio.stopMic());
 })();

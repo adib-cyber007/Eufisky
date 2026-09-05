@@ -4,7 +4,7 @@
 <body class="dashboard-page">
   <main class="dashboard-shell">
     <header class="dashboard-header"><div><a class="back-link" href="/">Eufisky</a><h1>Family dashboard</h1><p>Margaret’s protected line · room <b data-room>demo</b></p></div><span id="connection" class="connection">Connecting…</span></header>
-    <nav class="tabs" aria-label="Dashboard sections"><button class="active" data-tab="live">Live</button><button data-tab="contacts">Contacts</button><button data-tab="history">History</button></nav>
+    <nav class="tabs" aria-label="Dashboard sections"><button class="active" data-tab="live">Live</button><button data-tab="contacts">Contacts</button><button data-tab="messages">Messages</button><button data-tab="history">History</button></nav>
     <section id="panel-live" class="tab-panel active">
       <div class="monitor-grid">
         <section class="risk-console" aria-labelledby="risk-title">
@@ -26,6 +26,7 @@
       <ol id="timeline-list" class="timeline-list"><li class="empty">Call states and safety levels will appear here.</li></ol>
     </section>
     <section id="panel-contacts" class="tab-panel"><div class="section-heading"><div><h2>Contacts</h2><p>Trusted people always ring through without monitoring.</p></div></div><form id="contact-form" class="contact-form"><input id="contact-label" required placeholder="Name or business"><input id="contact-phone" required type="tel" placeholder="Phone number"><select id="contact-status"><option value="trusted">Trusted</option><option value="blocked">Blocked</option><option value="pending">Pending</option></select><button class="button call" type="submit">Add contact</button></form><div id="contact-list" class="data-list"></div></section>
+    <section id="panel-messages" class="tab-panel"><div class="section-heading"><div><h2>Messages</h2><p>Messages taken by the Front Door agent.</p></div><button id="refresh-messages" class="button secondary" type="button">Refresh</button></div><div id="message-list" class="data-list"></div></section>
     <section id="panel-history" class="tab-panel"><div class="section-heading"><div><h2>Call history</h2><p>Trusted calls show routing only. Their words and audio are never saved.</p></div><button id="refresh-history" class="button secondary" type="button">Refresh</button></div><div id="history-list" class="data-list"></div></section>
   </main>
   <script src="/static/js/dashboard.js"></script>

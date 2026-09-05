@@ -7,3 +7,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .pytest-tmp/
+.pytest-phase3*/
+server.out.log
+server.err.log

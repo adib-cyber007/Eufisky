@@ -58,6 +58,29 @@ class FakeSocket:
         self.audio.append(payload)
 
 
+class FakeAgent:
+    def __init__(self) -> None:
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self.called = False
+
+    async def start(self, instructions, tools, context) -> None:
+        await self.queue.put({"type": "say", "text": "Hello, who's calling?"})
+
+    async def on_user_text(self, text: str) -> None:
+        if not self.called:
+            self.called = True
+            await self.queue.put({
+                "type": "tool_call", "name": "connect_caller", "id": "call-1",
+                "args": {"caller_name": "Pat", "purpose": "a delivery"},
+            })
+
+    async def tool_result(self, call_id, result) -> None: pass
+    async def close(self) -> None: pass
+    async def events(self):
+        while True:
+            yield await self.queue.get()
+
+
 @pytest.fixture()
 def call_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
@@ -69,19 +92,33 @@ def call_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         registry.register_phone("demo", role, socket,
                                 "+15550199321" if role == "caller" else None)
     FakeSTT.instances.clear()
-    return CallController(registry, stt_factory=FakeSTT), sockets
+    return CallController(
+        registry, stt_factory=FakeSTT, backend_factory=FakeAgent,
+        closing_delay=0, intro_delay=0,
+    ), sockets
+
+
+async def screen_and_answer(controller: CallController):
+    call = await controller.dial("demo", "+15550199321")
+    assert call.state == CallState.SCREENING
+    await controller.text("demo", "caller", "My name is Pat, calling about a delivery")
+    assert call.state == CallState.DIALING_SENIOR
+    await controller.answer("demo", "senior")
+    assert call.state == CallState.BRIDGED
+    return call
 
 
 @pytest.mark.asyncio
 async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> None:
     controller, sockets = call_setup
     call = await controller.dial("demo", "+15550199321")
-    assert call.state == CallState.RINGING_SENIOR
-    assert FakeSTT.instances == []
+    assert call.state == CallState.SCREENING
+    assert len(FakeSTT.instances) == 1
     assert any(message.get("type") == "agent_say" for message in sockets["caller"].json)
+    await controller.text("demo", "caller", "My name is Pat, calling about a delivery")
+    assert call.state == CallState.DIALING_SENIOR
     assert any(message.get("type") == "ring" for message in sockets["senior"].json)
-    await controller.text("demo", "caller", "My name is Pat")
-    assert db.list_segments(call.id)[0]["text"] == "My name is Pat"
+    assert db.list_segments(call.id)[0]["text"] == "My name is Pat, calling about a delivery"
     screening_frame = b"\x02\x00" * 1600
     await controller.relay("demo", "caller", screening_frame)
     assert sockets["senior"].audio == []
@@ -92,7 +129,7 @@ async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> 
     frame = b"\x01\x00" * 1600
     await controller.relay("demo", "caller", frame)
     assert sockets["senior"].audio == [frame]
-    assert next(stream for stream in FakeSTT.instances if stream.speaker == "caller").audio == [frame]
+    assert [stream for stream in FakeSTT.instances if stream.speaker == "caller"][-1].audio == [frame]
 
     assert await controller.ring_family("demo") is True
     await controller.answer("demo", "family")
@@ -101,7 +138,7 @@ async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> 
 
     await controller.text("demo", "caller", "Please send gift cards")
     assert [segment["text"] for segment in db.list_segments(call.id)] == [
-        "My name is Pat", "Please send gift cards"
+        "My name is Pat, calling about a delivery", "Please send gift cards"
     ]
     await controller.hangup("demo")
     assert call.state == CallState.ENDED
@@ -115,10 +152,9 @@ async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> 
 @pytest.mark.asyncio
 async def test_hold_stops_audio_both_directions(call_setup) -> None:
     controller, sockets = call_setup
-    await controller.dial("demo", "+15550199321")
-    await controller.answer("demo", "senior")
+    await screen_and_answer(controller)
     await controller.hold("demo", "caller", True)
-    caller_stream = next(stream for stream in FakeSTT.instances if stream.speaker == "caller")
+    caller_stream = [stream for stream in FakeSTT.instances if stream.speaker == "caller"][-1]
     assert caller_stream.closed is True
     await controller.relay("demo", "caller", b"\x00\x00")
     await controller.relay("demo", "senior", b"\x00\x00")
@@ -126,15 +162,14 @@ async def test_hold_stops_audio_both_directions(call_setup) -> None:
     assert sockets["senior"].audio == []
     await controller.hold("demo", "caller", False)
     caller_streams = [stream for stream in FakeSTT.instances if stream.speaker == "caller"]
-    assert len(caller_streams) == 2
+    assert len(caller_streams) == 3
     assert caller_streams[-1].closed is False
 
 
 @pytest.mark.asyncio
 async def test_relay_adds_less_than_250ms(call_setup) -> None:
     controller, _ = call_setup
-    await controller.dial("demo", "+15550199321")
-    await controller.answer("demo", "senior")
+    await screen_and_answer(controller)
     started = time.perf_counter()
     await controller.relay("demo", "caller", b"\x00\x00" * 1600)
     assert time.perf_counter() - started < 0.250
@@ -144,8 +179,7 @@ async def test_relay_adds_less_than_250ms(call_setup) -> None:
 @pytest.mark.asyncio
 async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
     controller, sockets = call_setup
-    call = await controller.dial("demo", "+15550199321")
-    await controller.answer("demo", "senior")
+    call = await screen_and_answer(controller)
     await controller.text(
         "demo", "caller",
         "This is Medicare, your benefits will be suspended today unless we verify",
@@ -172,7 +206,7 @@ async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
         for message in sockets["senior"].json
     ) == 1
     assert [segment["speaker"] for segment in db.list_segments(call.id)] == [
-        "caller", "caller", "senior"
+        "caller", "caller", "caller", "senior"
     ]
     await controller.hangup("demo")
 

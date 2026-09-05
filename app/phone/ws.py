@@ -60,7 +60,7 @@ async def phone_socket(websocket: WebSocket) -> None:
         if current and current.state != CallState.ENDED:
             await websocket.send_json({"type": "state", "call_state": current.state.value,
                                        "badge": current.badge, "monitored": current.monitored})
-            if role == "senior" and current.state == CallState.RINGING_SENIOR:
+            if role == "senior" and current.state in {CallState.RINGING_SENIOR, CallState.DIALING_SENIOR}:
                 await websocket.send_json({"type": "ring", "from_label": current.label,
                                            "trusted": current.classification == "trusted"})
             if role == "family" and current.family_ringing:

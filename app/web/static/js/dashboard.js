@@ -10,6 +10,7 @@
     document.querySelectorAll("[data-tab]").forEach((item) => item.classList.toggle("active", item === button));
     document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${button.dataset.tab}`));
     if (button.dataset.tab === "contacts") loadContacts();
+    if (button.dataset.tab === "messages") loadMessages();
     if (button.dataset.tab === "history") loadHistory();
   }));
 
@@ -56,6 +57,20 @@
       row.querySelector("b").textContent = call.classification;
       row.querySelector("em").textContent = call.classification === "trusted" ? "Private" : `Peak risk ${call.peak_risk || 0}`;
       row.querySelector("small").textContent = call.ended_at ? "Ended" : "In progress";
+      list.append(row);
+    });
+  }
+
+  async function loadMessages() {
+    const messages = await request("/messages");
+    const list = $("#message-list"); list.replaceChildren();
+    if (!messages.length) { list.innerHTML = '<p class="empty">No messages yet.</p>'; return; }
+    messages.forEach((message) => {
+      const row = document.createElement("article"); row.className = "data-row";
+      row.innerHTML = '<div><strong></strong><span></span></div><div class="history-meta"><small></small></div>';
+      row.querySelector("strong").textContent = message.caller_name || "Unknown caller";
+      row.querySelector("span").textContent = message.body;
+      row.querySelector("small").textContent = message.callback_number ? `Callback: ${message.callback_number}` : new Date(message.created_at).toLocaleString();
       list.append(row);
     });
   }
@@ -152,6 +167,7 @@
     event.target.reset(); loadContacts();
   });
   $("#refresh-history").addEventListener("click", loadHistory);
+  $("#refresh-messages").addEventListener("click", loadMessages);
   $("#ring-family").addEventListener("click", async () => {
     const result = await request("/calls/current/ring-family", { method: "POST" });
     addTimeline({ type: "state", t_ms: 0, to: result.ok ? "FAMILY RINGING" : "NO ACTIVE CALL", trigger: result.ok ? "Sarah was invited" : "Answer a call first" });
@@ -166,6 +182,7 @@
     if (message.type === "ping") { socket.send(JSON.stringify({ type: "pong" })); return; }
     if (message.type === "call" && message.event === "started") resetLive(message.call_id);
     if (message.type === "call") loadHistory();
+    if (message.type === "message") loadMessages();
     if (message.type === "state") {
       $("#live-state").textContent = message.to;
       $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
@@ -175,5 +192,5 @@
     if (message.type === "risk") updateRisk(message);
     if (message.type === "level") addTimeline(message);
   });
-  loadContacts(); loadHistory();
+  loadContacts(); loadMessages(); loadHistory();
 })();

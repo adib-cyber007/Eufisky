@@ -26,9 +26,10 @@ class CallMonitor:
         call: Any,
         lexicon: dict[str, Any],
         stt_factory: Callable[[str, list[str], int], Any] = STTStream,
+        seed_score: int = 0,
     ) -> None:
         self.call = call
-        self.engine = RuleEngine(lexicon)
+        self.engine = RuleEngine(lexicon, seed_score=seed_score)
         self.publisher = EventPublisher(call.id, call.room)
         self.machine = CallStateMachine(
             self.publisher, lambda payload: call.room.send_phone("senior", payload)
