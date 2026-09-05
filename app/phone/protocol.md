@@ -39,6 +39,6 @@ equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
 5. Hangup closes both WAV files and marks the call `ENDED`.
 
 Dashboard clients connect to `/ws/dashboard?room=` and receive the documented
-`risk`, `transcript`, `state`, `level`, `tool`, and `call` events. This phase uses
+`risk`, `transcript`, `state`, `level`, `tool`, and `call` events. Phase 1 uses
 `state`, `call`, and typed `transcript` events; later phases add the remaining
 event types.

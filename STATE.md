@@ -1,5 +1,9 @@
 STATE SNAPSHOT:
 
+Current milestone: **Phase 1 — Simulated phone system, routing, and audio bridge (complete).**
+
+Next milestone: **Phase 2 — Monitoring, AssemblyAI streaming, deterministic rules, and live risk meter (not started).**
+
 (a) File tree (2 levels)
 
 ```text
@@ -90,7 +94,7 @@ The current Phase 1 server was left running on port 8000 after verification.
 
 (f) Decisions/defaults chosen
 
-- Kept all Phase 0 probes and architecture stubs intact; this phase extends only the phone system surfaces.
+- Kept all Phase 0 probes and architecture stubs intact; Phase 1 extends only the phone system surfaces.
 - Used synchronous stdlib SQLite helpers for short local operations and in-memory room objects for live sockets/call state.
 - Opened unknown-call WAVs at call start so even type-only monitored demos produce valid WAV containers; PCM frames fill them when the mic is on.
 - Reused `agent_say` for audible type-to-talk delivery, with `agent` naming the speaking phone role.
