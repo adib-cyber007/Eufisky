@@ -37,6 +37,33 @@ def test_lexicon_has_required_shape_and_safe_keyterms() -> None:
     assert terms[:4] == ["Medicare", "Social Security", "Margaret", "Sarah"]
 
 
+def test_generic_bank_card_request_and_digit_disclosure_cross_l2() -> None:
+    lexicon = load_lexicon()
+
+    for disclosure in (["1234"], ["one", "two", "three", "four"]):
+        engine = RuleEngine(lexicon)
+        caller = engine.ingest(WordEvent(
+            "caller",
+            "This is your bank fraud department. Verify your account number, "
+            "then read your debit card security code and CVV.",
+            1000,
+            True,
+        ))
+        assert caller is not None
+        assert "authority_impersonation" in caller.active_signals
+        assert "pii_request" in caller.active_signals
+        assert caller.score >= 65
+        assert "trigger_l2" in caller.flags
+
+        update = None
+        for index, text in enumerate(disclosure, 1):
+            candidate = engine.ingest(WordEvent("senior", text, 1000 + index * 100, True))
+            update = candidate or update
+        assert update is not None
+        assert "pii_disclosure" in update.active_signals
+        assert "trigger_l2" in update.flags
+
+
 def _replay(path: Path) -> tuple[bool, bool, int]:
     engine = RuleEngine(load_lexicon())
     l2 = False

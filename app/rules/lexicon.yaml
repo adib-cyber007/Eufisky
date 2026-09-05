@@ -9,11 +9,14 @@ signals:
     phrases:
       - medicare
       - social security
+      - bank
+      - your bank
       - internal revenue service
       - irs
       - sheriff
       - warrant
       - fraud department
+      - account security team
       - federal agent
       - your bank's fraud team
       - police department
@@ -87,6 +90,9 @@ signals:
     cap: 3
     phrases:
       - account number
+      - bank card
+      - debit card
+      - credit card number
       - medicare number
       - social security number
       - date of birth
@@ -97,6 +103,9 @@ signals:
       - verify your identity
       - routing number
       - security code
+      - cvv
+      - verify your account
+      - confirm your account
       - mother's maiden name
       - read me the number
       - confirm your details
@@ -206,7 +215,7 @@ patterns:
     weight: 40
     half_life_s: 300
     cap: 3
-    regex: '(?:\b\d{4,}\b|\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)?\d{2}\b)'
+    regex: '(?:\b\d{4,}\b|\b(?:\d[\s-]*){3,}\d\b|\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)?\d{2}\b)'
 
 combos:
   - families: [authority_impersonation, urgency, pii_request]
