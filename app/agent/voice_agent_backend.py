@@ -40,6 +40,7 @@ class VoiceAgentBackend:
         self._watchdogs: list[asyncio.Task[None]] = []
         self._text_history: list[str] = []
         self._fallback_pump: asyncio.Task[None] | None = None
+        self._startup_error: Exception | None = None
 
     @property
     def provider(self) -> str:
@@ -53,19 +54,22 @@ class VoiceAgentBackend:
             await self._start_fallback()
             return
         try:
-            self.socket = await asyncio.wait_for(
-                connect(
-                    URL,
-                    additional_headers={"Authorization": f"Bearer {settings.assemblyai_api_key}"},
-                    open_timeout=3,
-                ),
-                timeout=3,
-            )
-            self.reader = asyncio.create_task(self._read(), name="frontdoor-voice-agent")
-            voice_tools = [
-                {"type": "function", **tool["function"]} for tool in tools
-            ]
-            await self.socket.send(json.dumps({
+            await asyncio.wait_for(self._start_voice(instructions, tools, context), timeout=3.0)
+        except Exception:
+            await self._stop_socket()
+            await self._start_fallback()
+
+    async def _start_voice(
+        self, instructions: str, tools: list[dict[str, Any]], context: dict[str, Any]
+    ) -> None:
+        self.socket = await connect(
+            URL,
+            additional_headers={"Authorization": f"Bearer {settings.assemblyai_api_key}"},
+            open_timeout=3,
+        )
+        self.reader = asyncio.create_task(self._read(), name="voice-agent-reader")
+        voice_tools = [{"type": "function", **tool["function"]} for tool in tools]
+        await self.socket.send(json.dumps({
                 "type": "session.update",
                 "session": {
                     "system_prompt": instructions,
@@ -82,10 +86,9 @@ class VoiceAgentBackend:
                     "tools": voice_tools,
                 },
             }))
-            await asyncio.wait_for(self.ready.wait(), timeout=3)
-        except Exception:
-            await self._stop_socket()
-            await self._start_fallback()
+        await self.ready.wait()
+        if self._startup_error is not None:
+            raise self._startup_error
 
     async def _start_fallback(self) -> None:
         self.using_fallback = True
@@ -140,8 +143,9 @@ class VoiceAgentBackend:
                     raise RuntimeError(str(event.get("message") or event.get("error") or event))
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as error:
             if not self.closed and not self.ready.is_set():
+                self._startup_error = error
                 self.ready.set()
 
     async def on_user_text(self, text: str) -> None:
