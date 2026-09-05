@@ -48,6 +48,7 @@ STATE SNAPSHOT:
 - AssemblyAI Voice Agent accepts live audio, returns transcripts and audio, accepts a text-only turn, and calls `take_message`.
 - Batch transcription accepts stereo multichannel audio, all requested PII policies, WAV audio redaction, entity detection, and sentiment analysis; LLM Gateway returns the required incident JSON.
 - Smoke tests pass: 2 passed.
+- Git `main` is published to `https://github.com/adib-cyber007/Eufisky.git` and tracks `origin/main`.
 
 (c) What is stubbed/deferred
 
@@ -90,9 +91,8 @@ Open http://localhost:8000 and http://localhost:8000/api/health.
 
 HUMAN ACTIONS REQUIRED NOW:
 
-1. Open https://github.com/new in your browser and sign in if asked. In **Repository name**, enter `eufisky`; choose **Public**; leave README, `.gitignore`, and license creation turned off; click **Create repository**. Expected result: GitHub shows a new empty public repository named `eufisky`.
-2. On the new repository page, copy the **HTTPS** repository URL and paste it into this chat. Expected result: the URL looks like `https://github.com/your-name/eufisky.git`; I will add it as `origin` and push `main`. If Git Credential Manager appears during the push, click **Sign in with your browser** and approve it.
+None.
 
 BLOCKERS:
 
-- The local repository cannot be pushed until the owner supplies the new public GitHub repository URL. Recommendation: complete the two actions above; all local build and API verification is already complete.
+None.
