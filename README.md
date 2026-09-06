@@ -7,7 +7,7 @@ The current build includes the full phone-room demo, seeded dashboard history an
 
 ## Live demo
 
-[Open Eufisky](https://eufisky.onrender.com) or use the direct [Caller](https://eufisky.onrender.com/caller?room=demo), [Senior](https://eufisky.onrender.com/senior?room=demo), [Family](https://eufisky.onrender.com/family?room=demo), and [Dashboard](https://eufisky.onrender.com/dashboard?room=demo) pages. All phones participating in a call must use the same room name.
+[Open Eufisky](https://eufisky.onrender.com) or use the direct [Caller](https://eufisky.onrender.com/caller?room=demo), [Senior](https://eufisky.onrender.com/senior?room=demo), [Family](https://eufisky.onrender.com/family?room=demo), and [Dashboard](https://eufisky.onrender.com/dashboard?room=demo) pages. All phones participating in a call must use the same room name. Before dialing across devices, confirm each phone says `Room <name> • connected` and the Dashboard says `Live · room <name>`; a URL without `?room=` visibly reports that it is using the default `demo` room.
 
 ## Run locally
 

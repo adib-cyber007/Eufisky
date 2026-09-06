@@ -91,6 +91,9 @@ def test_replay_endpoint_delivers_complete_story_to_websocket(
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "replay-websocket.db")
     with TestClient(app) as client:
         with client.websocket_connect("/ws/dashboard?room=replay-websocket") as socket:
+            assert socket.receive_json() == {
+                "type": "registered", "role": "dashboard", "room": "replay-websocket",
+            }
             assert socket.receive_json()["trigger"] == "snapshot"
             response = client.post(
                 "/api/rooms/replay-websocket/replay",

@@ -3,7 +3,12 @@
 import pytest
 
 from app.rules.engine import RiskUpdate
-from app.session.state_machine import CallStateMachine, SessionState
+from app.session.state_machine import (
+    AgentSessionConflict,
+    AgentSessionRegistry,
+    CallStateMachine,
+    SessionState,
+)
 
 
 class FakePublisher:
@@ -21,6 +26,18 @@ class FakePublisher:
 
 def update(score, active=(), t_ms=1000):
     return RiskUpdate(t_ms, score, list(active), [], [])
+
+
+def test_agent_session_registry_rejects_overlap_until_close_completed() -> None:
+    sessions = AgentSessionRegistry("one-call")
+    sessions.open("front_door")
+    with pytest.raises(AgentSessionConflict, match="active front_door"):
+        sessions.open("guardian")
+    assert sessions.active == "front_door"
+
+    sessions.closed("front_door")
+    sessions.open("guardian")
+    assert sessions.active == "guardian"
 
 
 def test_l2_formula_is_deterministic() -> None:

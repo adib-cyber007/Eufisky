@@ -2,11 +2,54 @@
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from app.rules.engine import RiskUpdate
 from app.session.events import EventPublisher
+
+LOGGER = logging.getLogger("uvicorn.error")
+
+
+class AgentSessionConflict(RuntimeError):
+    """Raised when a call tries to own two Voice Agent sessions at once."""
+
+
+class AgentSessionRegistry:
+    """Enforce one fully-open Voice Agent lifecycle per call."""
+
+    def __init__(self, call_id: str) -> None:
+        self.call_id = call_id
+        self.active: str | None = None
+
+    def open(self, agent: str) -> None:
+        if self.active is not None:
+            LOGGER.error(
+                "Rejected concurrent agent session call_id=%s active=%s requested=%s",
+                self.call_id,
+                self.active,
+                agent,
+            )
+            raise AgentSessionConflict(
+                f"call {self.call_id} already has active {self.active} agent session"
+            )
+        self.active = agent
+        LOGGER.info("Agent session opened call_id=%s agent=%s", self.call_id, agent)
+
+    def closed(self, agent: str) -> None:
+        if self.active != agent:
+            LOGGER.error(
+                "Agent session close mismatch call_id=%s active=%s closing=%s",
+                self.call_id,
+                self.active,
+                agent,
+            )
+            raise AgentSessionConflict(
+                f"call {self.call_id} cannot close {agent}; active session is {self.active}"
+            )
+        self.active = None
+        LOGGER.info("Agent session closed call_id=%s agent=%s", self.call_id, agent)
 
 
 class SessionState(str, Enum):
@@ -77,7 +120,8 @@ class CallStateMachine:
             await self.publisher.level(update.t_ms, 1, "score_gte_40")
             await self.send_senior({"type": "tone", "name": "chime"})
             await self.send_senior({
-                "type": "agent_say", "text": "Eufisky is listening.", "agent": "guardian"
+                "type": "agent_say", "text": "Eufisky is listening.", "agent": "guardian",
+                "playback": "speech",
             })
 
         if update.score >= 90 and 3 not in self.levels_published:

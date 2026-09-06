@@ -1,5 +1,6 @@
 (function () {
-  const room = new URLSearchParams(location.search).get("room") || "demo";
+  const requestedRoom = new URLSearchParams(location.search).get("room");
+  const room = requestedRoom?.trim() || "demo";
   const $ = (selector) => document.querySelector(selector);
   const seenTranscript = new Set();
   const seenTimeline = new Set();
@@ -11,6 +12,9 @@
   let unreadMessages = 0;
 
   document.querySelectorAll("[data-room]").forEach((node) => { node.textContent = room; });
+  document.querySelectorAll(".back-link").forEach((link) => {
+    if (link.getAttribute("href") === "/") link.href = `/?room=${encodeURIComponent(room)}`;
+  });
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -439,6 +443,12 @@
       if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "pong" }));
       return;
     }
+    if (message.type === "registered") {
+      const matches = message.room === room && message.role === "dashboard";
+      $("#connection").textContent = matches ? `Live · room ${room}` : "Room mismatch";
+      $("#connection").classList.toggle("online", matches);
+      return;
+    }
     if (message.type === "replay") {
       if (message.status === "started") {
         resetLive("replay-demo");
@@ -491,8 +501,7 @@
     socket = new WebSocket(`${scheme}://${location.host}/ws/dashboard?room=${encodeURIComponent(room)}`);
     socket.addEventListener("open", () => {
       reconnectAttempt = 0;
-      $("#connection").textContent = "Live connection";
-      $("#connection").classList.add("online");
+      $("#connection").textContent = `Checking room ${room}…`;
     });
     socket.addEventListener("message", handleSocketMessage);
     socket.addEventListener("close", () => {

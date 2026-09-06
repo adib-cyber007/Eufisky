@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from contextlib import suppress
 from typing import Any
 
@@ -14,6 +15,7 @@ from app.phone.calls import CallState, calls
 from app.rooms import rooms
 
 VALID_ROLES = {"caller", "senior", "family"}
+LOGGER = logging.getLogger("uvicorn.error")
 
 
 def normalize_message(raw: str) -> dict[str, Any]:
@@ -56,8 +58,19 @@ async def phone_socket(websocket: WebSocket) -> None:
         room_name = str(hello.get("room") or "demo").strip()
         role = str(hello["role"])
         db.ensure_room(room_name)
-        connection = rooms.register_phone(room_name, role, websocket, hello.get("caller_phone"))
         live = rooms.get(room_name)
+        previous = live.phones.get(role)
+        connection = rooms.register_phone(room_name, role, websocket, hello.get("caller_phone"))
+        LOGGER.info("Phone websocket registered role=%s room=%s", role, room_name)
+        if previous is not None and previous.socket is not websocket:
+            LOGGER.warning("Replacing duplicate phone websocket role=%s room=%s", role, room_name)
+            with suppress(Exception):
+                await previous.socket.send_json({
+                    "type": "ended",
+                    "reason": "This phone was opened in another tab. This copy was disconnected.",
+                })
+                await previous.socket.close(code=1000)
+        await websocket.send_json({"type": "registered", "role": role, "room": room_name})
         current = live.current_call
         if current and current.state != CallState.ENDED:
             await websocket.send_json({"type": "state", "call_state": current.state.value,
@@ -94,7 +107,16 @@ async def phone_socket(websocket: WebSocket) -> None:
             if message_type == "hello":
                 connection.caller_phone = payload.get("caller_phone", connection.caller_phone)
             elif message_type == "dial" and role == "caller":
-                await calls.dial(room_name, connection.caller_phone)
+                LOGGER.info("Dial received role=%s room=%s", role, room_name)
+                try:
+                    await calls.dial(room_name, connection.caller_phone)
+                except Exception:
+                    LOGGER.exception("Call creation failed role=%s room=%s", role, room_name)
+                    with suppress(Exception):
+                        await websocket.send_json({
+                            "type": "ended",
+                            "reason": "Sorry, something went wrong. Please try again.",
+                        })
             elif message_type == "answer":
                 await calls.answer(room_name, role)
             elif message_type == "hangup":
@@ -115,8 +137,10 @@ async def phone_socket(websocket: WebSocket) -> None:
                 await websocket.send_json(
                     {"type": "error", "message": "Unsupported phone message"}
                 )
-    except (WebSocketDisconnect, RuntimeError):
-        pass
+    except WebSocketDisconnect:
+        LOGGER.info("Phone websocket disconnected role=%s room=%s", role or "unknown", room_name or "unknown")
+    except RuntimeError:
+        LOGGER.exception("Phone websocket runtime failure role=%s room=%s", role or "unknown", room_name or "unknown")
     except (ValueError, json.JSONDecodeError) as exc:
         with suppress(Exception):
             await websocket.send_json({"type": "ended", "reason": str(exc)})
@@ -139,8 +163,10 @@ async def dashboard_socket(websocket: WebSocket, room_name: str) -> None:
     await websocket.accept()
     db.ensure_room(room_name)
     rooms.register_dashboard(room_name, websocket)
+    LOGGER.info("Dashboard websocket registered room=%s", room_name)
     heartbeat = asyncio.create_task(_heartbeat(websocket))
     try:
+        await websocket.send_json({"type": "registered", "role": "dashboard", "room": room_name})
         await websocket.send_json(rooms.snapshot(room_name))
         while True:
             raw = await websocket.receive_text()
@@ -158,8 +184,10 @@ async def dashboard_socket(websocket: WebSocket, room_name: str) -> None:
                 await websocket.send_json(
                     {"type": "error", "message": "Unsupported dashboard message"}
                 )
-    except (WebSocketDisconnect, RuntimeError):
-        pass
+    except WebSocketDisconnect:
+        LOGGER.info("Dashboard websocket disconnected room=%s", room_name)
+    except RuntimeError:
+        LOGGER.exception("Dashboard websocket runtime failure room=%s", room_name)
     finally:
         heartbeat.cancel()
         with suppress(asyncio.CancelledError, Exception):

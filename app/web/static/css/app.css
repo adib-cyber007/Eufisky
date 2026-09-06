@@ -192,6 +192,9 @@ input::placeholder { color: #9A9488; opacity: 1; }
 .risk-badge.guardian { color: #843B20; background: #F8D8C8; }
 .risk-badge.critical { color: #802632; background: #F6D0D4; }
 .connection.online { color: #2F6A43; border-color: rgba(47, 106, 67, 0.28); }
+.room-connection { margin-left: 0.15rem; color: #6B625E; font-size: 0.68rem; }
+.room-connection.verified { color: #2F6A43; }
+.room-connection.warning { color: #9A4D23; }
 
 /* Landing */
 .lobby { display: block; padding: 1.5rem; }

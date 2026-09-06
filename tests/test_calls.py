@@ -107,8 +107,10 @@ def call_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 async def screen_and_answer(controller: CallController):
     call = await controller.dial("demo", "+15550199321")
     assert call.state == CallState.SCREENING
+    assert call.agent_sessions.active == "front_door"
     await controller.text("demo", "caller", "My name is Pat, calling about a delivery")
     assert call.state == CallState.DIALING_SENIOR
+    assert call.agent_sessions.active is None
     await controller.answer("demo", "senior")
     assert call.state == CallState.BRIDGED
     return call
@@ -208,6 +210,7 @@ async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
     assert samples and max(sample["score"] for sample in samples) >= 65
     assert 1 in levels and 2 in levels
     assert call.state == CallState.GUARDIAN
+    assert call.agent_sessions.active == "guardian"
     assert {"type": "hold", "on": True} in sockets["caller"].json
     assert not any(message.get("agent") == "guardian" for message in sockets["caller"].json)
     assert sum(
@@ -218,6 +221,32 @@ async def test_typed_monitoring_persists_risk_and_levels(call_setup) -> None:
         "caller", "caller", "caller", "senior"
     ]
     await controller.hangup("demo")
+    assert call.agent_sessions.active is None
+
+
+@pytest.mark.asyncio
+async def test_full_unknown_flow_persists_call_row_and_events(call_setup, monkeypatch) -> None:
+    controller, _ = call_setup
+    monkeypatch.setattr(call_module.postcall, "enqueue", lambda _call_id: None)
+    call = await screen_and_answer(controller)
+    await controller.text(
+        "demo", "caller",
+        "This is Medicare. Your benefits are suspended unless you verify",
+    )
+    await controller.text("demo", "caller", "Read me your Medicare card number")
+    assert call.state == CallState.GUARDIAN
+    await controller.guardian_action("demo", "senior", "family")
+    await controller.answer("demo", "family")
+    await controller.guardian_action("demo", "family", "end")
+
+    stored = db.get_call(call.id)
+    event_types = [event["type"] for event in db.list_events(call.id)]
+    assert stored is not None
+    assert stored["final_state"] == "WRAPUP"
+    assert stored["ended_at"]
+    assert {"call", "state", "risk", "level", "tool", "family"} <= set(event_types)
+    assert len(db.list_segments(call.id)) >= 3
+    assert call.agent_sessions.active is None
 
 
 @pytest.mark.asyncio

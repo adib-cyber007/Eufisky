@@ -103,6 +103,7 @@ class FrontDoorSession:
                     await self.call.room.send_phone("caller", {
                         "type": "agent_say", "text": str(event.get("text") or ""),
                         "agent": "front_door",
+                        "playback": "speech",
                     })
                 elif event_type == "caption":
                     await self.call.room.send_phone("caller", {
@@ -147,7 +148,8 @@ class FrontDoorSession:
         try:
             await asyncio.sleep(5)
             await self.call.room.send_phone("caller", {
-                "type": "agent_say", "text": "One moment.", "agent": "front_door"
+                "type": "agent_say", "text": "One moment.", "agent": "front_door",
+                "playback": "speech",
             })
         except asyncio.CancelledError:
             raise

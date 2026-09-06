@@ -6,7 +6,9 @@ sends `answer{}`. Any phone can send `hangup{}`, `text{text}`, `mic{on}`, or
 `dtmf{digit}`. Guardian controls send `guardian_action{action}` where action is
 `end`, `family`, or `continue`. Binary messages are 100 ms frames of signed little-endian PCM16,
 mono, 16 kHz. The server sends `state{call_state,badge,monitored}`,
-`ring{from_label,trusted,reason?}`, `agent_say{text,agent}`, `hold{on}`, `tone{name}`,
+`registered{role,room}` immediately after accepting the hello,
+`ring{from_label,trusted,reason?}`, `agent_say{text,agent,playback}`, `agent_output_reset{}`,
+`hold{on}`, `tone{name}`,
 `guardian_controls{visible,family_name?,fallback?}`,
 `notice{t_ms,kind,caller_label,purpose,callback_number}`, `ended{reason}`, or binary
 PCM16. A JSON `ping` is sent every 15 seconds. `notice` is sent to the Senior
@@ -14,6 +16,10 @@ phone for each Front Door `take_message` or `decline` outcome and is also
 published once on the dashboard feed.
 Clients may encode an event as `{"type":"text","text":"hello"}` or the
 equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
+The `registered` acknowledgement is the authoritative active room shown by each
+browser page. `agent_say` uses browser speech only when `playback` is `speech`;
+binary PCM is the returned Voice Agent audio path. `agent_output_reset` cancels
+both paths before an agent handoff or deterministic closing line.
 
 ## Trusted call
 
@@ -41,6 +47,9 @@ equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
 4. A deterministic L2 risk trigger enters `GUARDIAN`, detaches both monitoring
    streams, and sends the caller `hold{on:true}` plus `tone{hold_music}` before
    the private Guardian backend starts. Only the senior receives Guardian speech.
+   The per-call agent registry rejects Guardian startup until the Front Door
+   session's awaited close has completed, so at most one Voice Agent session is
+   open for the call.
 5. `conference_family` enters `FAMILY_CONF` and rings the family with a reason.
    Senior and family can speak privately while the caller remains held. Either
    can explicitly resume the caller or end the call.

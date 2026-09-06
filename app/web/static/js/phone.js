@@ -1,8 +1,17 @@
 (function () {
   const role = document.body.dataset.role;
-  const room = new URLSearchParams(location.search).get("room") || "demo";
+  const requestedRoom = new URLSearchParams(location.search).get("room");
+  const room = requestedRoom?.trim() || "demo";
   const $ = (selector) => document.querySelector(selector);
   document.querySelectorAll("[data-room]").forEach((node) => { node.textContent = room; });
+  document.querySelectorAll(".back-link").forEach((link) => {
+    if (link.getAttribute("href") === "/") link.href = `/?room=${encodeURIComponent(room)}`;
+  });
+  const roomIndicator = document.querySelector(".room-pill");
+  const roomConnection = document.createElement("span");
+  roomConnection.className = requestedRoom?.trim() ? "room-connection" : "room-connection warning";
+  roomConnection.textContent = requestedRoom?.trim() ? "• connecting" : "• default room";
+  roomIndicator?.append(roomConnection);
 
   let connected = false;
   let active = false;
@@ -84,11 +93,20 @@
   });
   socket.addEventListener("close", () => {
     connected = false;
+    roomConnection.textContent = "• disconnected";
+    roomConnection.className = "room-connection warning";
+    audio.resetOutput();
     setCopy("Connection closed", "Refresh this page to reconnect.");
   });
   socket.addEventListener("message", async (event) => {
     if (event.data instanceof ArrayBuffer) { await audio.play(event.data); return; }
     const message = JSON.parse(event.data);
+    if (message.type === "registered") {
+      const matches = message.room === room && message.role === role;
+      roomConnection.textContent = matches ? "• connected" : "• room mismatch";
+      roomConnection.className = `room-connection ${matches ? "verified" : "warning"}`;
+      return;
+    }
     if (message.type === "state") renderState(message);
     if (message.type === "ring") {
       $("#caption").textContent = "";
@@ -101,8 +119,9 @@
     }
     if (message.type === "agent_say") {
       $("#caption").textContent = message.text;
-      audio.speak(message.text);
+      if (message.playback !== "audio") audio.speak(message.text);
     }
+    if (message.type === "agent_output_reset") audio.resetOutput();
     if (message.type === "agent_caption") $("#caption").textContent = message.text;
     if (message.type === "notice" && role === "senior") {
       noticeQueue.push(message);
@@ -128,7 +147,8 @@
       if ($("#answer")) $("#answer").hidden = true;
       if ($("#decline")) $("#decline").hidden = true;
       if ($("#guardian-controls")) $("#guardian-controls").hidden = true;
-      window.speechSynthesis.cancel();
+      $("#hold").hidden = true;
+      audio.resetOutput();
       audio.holdMusic(false);
     }
     if (message.type === "ping") send("pong");
@@ -166,5 +186,8 @@
       send("text", { text: input.value.trim() }); input.value = "";
     }
   });
-  window.addEventListener("beforeunload", () => { audio.stopMic(); audio.holdMusic(false); });
+  window.addEventListener("beforeunload", () => {
+    audio.destroy();
+    if (socket.readyState < WebSocket.CLOSING) socket.close(1000, "page closed");
+  });
 })();

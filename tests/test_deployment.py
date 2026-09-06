@@ -67,3 +67,13 @@ def test_landing_explains_free_host_cold_start() -> None:
     landing = (PROJECT_ROOT / "app" / "web" / "index.html").read_text(encoding="utf-8")
     assert 'id="cold-start-hint"' in landing
     assert "first load after a quiet period may take about 40 seconds" in landing
+
+
+def test_browser_websockets_follow_page_scheme_and_host() -> None:
+    scripts = PROJECT_ROOT / "app" / "web" / "static" / "js"
+    phone = (scripts / "phone.js").read_text(encoding="utf-8")
+    dashboard = (scripts / "dashboard.js").read_text(encoding="utf-8")
+    for source in (phone, dashboard):
+        assert 'location.protocol === "https:" ? "wss" : "ws"' in source
+        assert "${location.host}" in source
+        assert "ws://localhost" not in source

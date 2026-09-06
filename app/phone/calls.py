@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
@@ -21,11 +22,13 @@ from app.rules.loader import load_lexicon
 from app.rooms import LiveRoom, RoomRegistry, rooms
 from app.session.context import CallMonitor, guardian_context
 from app.session.events import EventPublisher
+from app.session.state_machine import AgentSessionRegistry
 from app.stt.assemblyai_stream import STTStream
 from app.postcall import pipeline as postcall
 from app.runtime_paths import PROJECT_ROOT, recordings_dir
 
 RECORDINGS_DIR = recordings_dir()
+LOGGER = logging.getLogger("uvicorn.error")
 
 
 class CallState(str, Enum):
@@ -58,6 +61,7 @@ class CallSession:
         self.recorders: dict[str, WavWriter] = {}
         self.recording_paths: dict[str, str] = {}
         self.publisher = EventPublisher(self.id, room)
+        self.agent_sessions = AgentSessionRegistry(self.id)
         self.monitor: CallMonitor | None = None
         self.frontdoor: FrontDoorSession | None = None
         self.guardian: GuardianSession | None = None
@@ -131,6 +135,22 @@ class CallController:
                    "family_ringing": call.family_ringing}
         await asyncio.gather(*(call.room.send_phone(role, payload) for role in roles))
 
+    async def _close_frontdoor(self, call: CallSession) -> None:
+        session = call.frontdoor
+        if session is None:
+            return
+        await session.close()
+        call.frontdoor = None
+        call.agent_sessions.closed("front_door")
+
+    async def _close_guardian(self, call: CallSession) -> None:
+        session = call.guardian
+        if session is None:
+            return
+        await session.close()
+        call.guardian = None
+        call.agent_sessions.closed("guardian")
+
     async def dial(self, room_name: str, caller_phone: str | None) -> CallSession:
         live = self.registry.get(room_name)
         async with live.lock:
@@ -140,13 +160,21 @@ class CallController:
             classification, label = db.classify_phone(room_name, caller_phone)
             call = CallSession(live, caller_phone, label, classification)
             live.current_call = call
-            db.create_call({
-                "id": call.id, "room": room_name, "from_phone": call.caller_phone,
-                "from_label": call.label, "classification": classification,
-                "recording_caller": call.recording_paths.get("caller"),
-                "recording_senior": call.recording_paths.get("senior"),
-            })
-            db.add_event(call.id, 0, "call", {"event": "started", "classification": classification})
+            try:
+                db.create_call({
+                    "id": call.id, "room": room_name, "from_phone": call.caller_phone,
+                    "from_label": call.label, "classification": classification,
+                    "recording_caller": call.recording_paths.get("caller"),
+                    "recording_senior": call.recording_paths.get("senior"),
+                })
+                db.add_event(call.id, 0, "call", {
+                    "event": "started", "classification": classification,
+                })
+            except Exception:
+                live.current_call = None
+                call.close_recorders()
+                LOGGER.exception("Unable to persist new call room=%s call_id=%s", room_name, call.id)
+                raise
             await live.broadcast_dashboard({"type": "call", "t_ms": 0, "event": "started",
                                              "call_id": call.id, "classification": classification})
             if classification == "blocked":
@@ -161,12 +189,21 @@ class CallController:
             if classification == "unknown":
                 await self._transition(call, CallState.SCREENING, "unknown_caller")
                 await self._send_state(call, ("caller",))
-                call.frontdoor = FrontDoorSession(
-                    call, self.lexicon, self.backend_factory(),
-                    lambda event, score: self._agent_tool(call, event, score),
-                    self.stt_factory,
-                )
-                await call.frontdoor.start()
+                call.agent_sessions.open("front_door")
+                try:
+                    call.frontdoor = FrontDoorSession(
+                        call, self.lexicon, self.backend_factory(),
+                        lambda event, score: self._agent_tool(call, event, score),
+                        self.stt_factory,
+                    )
+                    await call.frontdoor.start()
+                except Exception:
+                    LOGGER.exception("Front Door failed to start call_id=%s room=%s", call.id, room_name)
+                    if call.frontdoor is not None:
+                        await self._close_frontdoor(call)
+                    else:
+                        call.agent_sessions.closed("front_door")
+                    raise
                 return call
             await self._transition(call, CallState.RINGING_SENIOR, "trusted")
             await self._send_state(call, ("caller", "senior"))
@@ -200,10 +237,11 @@ class CallController:
             call.claimed_org = str(decision.args.get("claimed_org") or "")
             if not call.claimed_org and "medicare" in call.purpose.casefold():
                 call.claimed_org = "Medicare"
-            if call.frontdoor:
-                await call.frontdoor.close()
+            await self._close_frontdoor(call)
+            await call.room.send_phone("caller", {"type": "agent_output_reset"})
             await call.room.send_phone("caller", {
-                "type": "agent_say", "text": decision.result["say"], "agent": "front_door"
+                "type": "agent_say", "text": decision.result["say"], "agent": "front_door",
+                "playback": "speech",
             })
             await self._transition(call, CallState.DIALING_SENIOR, "front_door_connected")
             await self._send_state(call, ("caller", "senior"))
@@ -226,11 +264,14 @@ class CallController:
                 "caller_name": decision.args["caller_name"], "body": decision.args["message"],
             })
         await self._screening_notice(call, decision.action, decision.args)
+        # The deterministic closing line must never race audio still arriving
+        # from the Voice Agent session.
+        await self._close_frontdoor(call)
+        await call.room.send_phone("caller", {"type": "agent_output_reset"})
         await call.room.send_phone("caller", {
-            "type": "agent_say", "text": decision.result["say"], "agent": "front_door"
+            "type": "agent_say", "text": decision.result["say"], "agent": "front_door",
+            "playback": "speech",
         })
-        if call.frontdoor:
-            await call.frontdoor.close()
         await asyncio.sleep(self.closing_delay)
         await self.hangup(call.room.room, decision.action)
 
@@ -272,6 +313,7 @@ class CallController:
                 "type": "agent_say",
                 "text": "She couldn't answer, so I'll pass along your message. Goodbye.",
                 "agent": "front_door",
+                "playback": "speech",
             })
             await asyncio.sleep(2)
             await self.hangup(call.room.room, "senior did not answer")
@@ -294,6 +336,7 @@ class CallController:
                     "type": "agent_say",
                     "text": f"Call from {call.caller_name} about {call.purpose}. Connecting.",
                     "agent": "front_door",
+                    "playback": "speech",
                 })
                 await asyncio.sleep(self.intro_delay)
                 await self._transition(call, target, "intro_complete")
@@ -326,8 +369,10 @@ class CallController:
             await call.monitor.pause_for_guardian(lambda text: self._guardian_text(call, text))
         await call.room.send_phone("caller", {"type": "hold", "on": True})
         await call.room.send_phone("caller", {"type": "tone", "name": "hold_music"})
+        await call.room.send_phone("senior", {"type": "agent_output_reset"})
         await call.room.send_phone("senior", {
-            "type": "agent_say", "text": "One moment, Margaret.", "agent": "guardian"
+            "type": "agent_say", "text": "One moment, Margaret.", "agent": "guardian",
+            "playback": "speech",
         })
         await self._send_state(call)
         await call.room.broadcast_dashboard({
@@ -340,11 +385,20 @@ class CallController:
             senior_name=settings.senior_name, family_name=settings.family_name,
             recommendation=call.guardian_recommendation,
         )
-        call.guardian = GuardianSession(
-            call, self.backend_factory(), context,
-            lambda event: self._guardian_tool(call, event),
-        )
-        await call.guardian.start()
+        call.agent_sessions.open("guardian")
+        try:
+            call.guardian = GuardianSession(
+                call, self.backend_factory(), context,
+                lambda event: self._guardian_tool(call, event),
+            )
+            await call.guardian.start()
+        except Exception:
+            LOGGER.exception("Guardian failed to start call_id=%s room=%s", call.id, call.room.room)
+            if call.guardian is not None:
+                await self._close_guardian(call)
+            else:
+                call.agent_sessions.closed("guardian")
+            raise
         if call.monitor is not None:
             await call.monitor.start_guardian_listening()
 
@@ -401,13 +455,18 @@ class CallController:
         guardian = call.guardian
         if guardian is not None:
             await guardian.tool_result(str(event.get("id") or ""), result)
+            await self._close_guardian(call)
         reassurance = {
             "resume_call": "All right. I will reconnect you now.",
             "add_to_trusted": "All right. I saved that choice and will reconnect you.",
             "conference_family": f"{settings.family_name}'s phone is ringing. You're not alone.",
             "end_call": "You're safe. I have ended the call.",
         }[name]
-        await call.room.send_phone("senior", {"type": "agent_say", "text": reassurance, "agent": "guardian"})
+        await call.room.send_phone("senior", {"type": "agent_output_reset"})
+        await call.room.send_phone("senior", {
+            "type": "agent_say", "text": reassurance, "agent": "guardian",
+            "playback": "speech",
+        })
         call.state = CallState(call.monitor.machine.state.value)
         await self._send_state(call)
         await call.room.broadcast_dashboard({
@@ -421,16 +480,10 @@ class CallController:
             await call.room.send_phone("caller", {"type": "tone", "name": "hold_stop"})
             await call.room.send_phone("senior", {"type": "guardian_controls", "visible": False})
             await call.room.send_phone("family", {"type": "guardian_controls", "visible": False})
-            call.guardian = None
-            if guardian is not None:
-                await guardian.close()
             await call.monitor.resume_monitoring()
         elif name == "conference_family":
             call.state = CallState.FAMILY_CONF
             await self._send_state(call)
-            call.guardian = None
-            if guardian is not None:
-                await guardian.close()
         elif name == "end_call":
             if self.closing_delay:
                 await asyncio.sleep(self.closing_delay)
@@ -458,17 +511,14 @@ class CallController:
             return
         if call.dial_timeout and call.dial_timeout is not asyncio.current_task() and not call.dial_timeout.done():
             call.dial_timeout.cancel()
-        if call.frontdoor is not None:
-            await call.frontdoor.close()
+        await self._close_frontdoor(call)
         machine_wrapped = False
         if call.monitor is not None:
             await call.monitor.machine.on_hangup(call.elapsed_ms)
             call.state = CallState.WRAPUP
             machine_wrapped = True
             await call.monitor.close()
-        if call.guardian is not None:
-            await call.guardian.close()
-            call.guardian = None
+        await self._close_guardian(call)
         if not machine_wrapped:
             await self._transition(call, CallState.WRAPUP, reason)
         call.close_recorders()
@@ -586,7 +636,7 @@ class CallController:
         else:
             targets = [role for role in ("caller", "senior", "family") if role != sender and (role != "family" or call.family_joined)]
         await asyncio.gather(*(live.send_phone(role, {"type": "agent_say", "text": text,
-                                                       "agent": sender}) for role in targets))
+                                                       "agent": sender, "playback": "speech"}) for role in targets))
 
 
 calls = CallController()

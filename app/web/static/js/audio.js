@@ -12,6 +12,7 @@
       this.processor = null;
       this.pending = [];
       this.playAt = 0;
+      this.playSources = new Set();
       this.holdTimer = null;
     }
 
@@ -102,6 +103,8 @@
       const channel = audio.getChannelData(0);
       for (let i = 0; i < pcm.length; i += 1) channel[i] = pcm[i] / 32768;
       const source = context.createBufferSource();
+      this.playSources.add(source);
+      source.addEventListener("ended", () => this.playSources.delete(source), { once: true });
       source.buffer = audio;
       source.connect(context.destination);
       const now = context.currentTime;
@@ -110,12 +113,32 @@
       this.playAt += audio.duration;
     }
 
+    stopPcm() {
+      this.playSources.forEach((source) => {
+        try { source.stop(); } catch (_) { /* already stopped */ }
+      });
+      this.playSources.clear();
+      this.playAt = this.context ? this.context.currentTime : 0;
+    }
+
+    resetOutput() {
+      window.speechSynthesis.cancel();
+      this.stopPcm();
+    }
+
     speak(text) {
+      this.stopPcm();
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.93;
       utterance.pitch = 1;
       window.speechSynthesis.speak(utterance);
+    }
+
+    destroy() {
+      this.stopMic();
+      this.holdMusic(false);
+      this.resetOutput();
     }
 
     async chime() {

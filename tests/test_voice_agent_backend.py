@@ -27,6 +27,22 @@ class Fallback:
                 yield {}
 
 
+class DecisionOnlyBackup:
+    provider = "decision-test"
+
+    def __init__(self, *args, **kwargs) -> None:
+        self.messages = []
+
+    async def start(self, instructions, tools, context) -> None: pass
+    async def on_user_text(self, text) -> None: pass
+    async def close(self) -> None: pass
+
+    async def events(self):
+        yield {"type": "say", "text": "duplicate greeting"}
+        yield {"type": "say", "text": "late backup voice"}
+        yield {"type": "tool_call", "name": "connect_caller", "args": {}, "id": "tool"}
+
+
 @pytest.mark.asyncio
 async def test_hanging_connection_falls_back_at_deadline(monkeypatch) -> None:
     async def hanging_connect(*args, **kwargs):
@@ -42,3 +58,17 @@ async def test_hanging_connection_falls_back_at_deadline(monkeypatch) -> None:
     assert asyncio.get_running_loop().time() - started < 0.1
     assert backend.using_fallback and fallback.started
     await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_voice_watchdog_never_mixes_backup_speech_with_voice_pcm(monkeypatch) -> None:
+    monkeypatch.setattr(voice_module, "WATCHDOG_DELAY", 0)
+    monkeypatch.setattr(voice_module, "LLMBackend", DecisionOnlyBackup)
+    backend = VoiceAgentBackend(fallback=Fallback())  # type: ignore[arg-type]
+    backend._instructions = "prompt"
+    await backend._text_turn_watchdog("caller text", 0)
+
+    queued = []
+    while not backend.queue.empty():
+        queued.append(backend.queue.get_nowait())
+    assert [event["type"] for event in queued] == ["tool_call"]

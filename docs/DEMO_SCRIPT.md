@@ -6,6 +6,9 @@ Use the hosted [Eufisky landing page](https://eufisky.onrender.com/?room=demo), 
 
 - Laptop: [Senior](https://eufisky.onrender.com/senior?room=demo), [Family](https://eufisky.onrender.com/family?room=demo), and [Dashboard](https://eufisky.onrender.com/dashboard?room=demo).
 - Phone or second device: [Caller](https://eufisky.onrender.com/caller?room=demo).
+- Before dialing, confirm every phone shows `Room demo • connected` and the
+  Dashboard shows `Live · room demo`. If any page says `default room`, reopen it
+  with the same explicit `?room=` value as the other devices.
 - Health check: [API health](https://eufisky.onrender.com/api/health).
 
 Every page must use the same `room` value. Allow about 40 seconds for the first load after the free service has been idle. HTTPS enables browser microphone permission; type-to-talk remains the most reliable presentation fallback.

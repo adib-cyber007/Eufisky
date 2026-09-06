@@ -34,7 +34,10 @@ class GuardianSession:
             self.fallback = True
             # Remote socket cleanup must never delay Margaret's fallback script.
             asyncio.create_task(self._close_backend(), name=f"guardian-cleanup-{self.call.id}")
-            await self.call.room.send_phone("senior", {"type": "agent_say", "text": self.greeting, "agent": "guardian"})
+            await self.call.room.send_phone("senior", {
+                "type": "agent_say", "text": self.greeting, "agent": "guardian",
+                "playback": "speech",
+            })
         await self.call.room.send_phone("senior", {"type": "guardian_controls", "visible": True, "family_name": self.context["family_name"], "fallback": self.fallback})
 
     async def _close_backend(self) -> None:
@@ -48,7 +51,10 @@ class GuardianSession:
                     return
                 kind = event.get("type")
                 if kind == "say":
-                    await self.call.room.send_phone("senior", {"type": "agent_say", "text": str(event.get("text") or ""), "agent": "guardian"})
+                    await self.call.room.send_phone("senior", {
+                        "type": "agent_say", "text": str(event.get("text") or ""),
+                        "agent": "guardian", "playback": "speech",
+                    })
                 elif kind == "caption":
                     await self.call.room.send_phone("senior", {"type": "agent_caption", "text": str(event.get("text") or ""), "agent": "guardian"})
                 elif kind == "audio":
@@ -77,7 +83,11 @@ class GuardianSession:
             self.tool_called = True
             await self.on_tool({"type": "tool_call", "name": direct[0], "args": direct[1], "id": "guardian-direct"})
         elif self.fallback:
-            await self.call.room.send_phone("senior", {"type": "agent_say", "text": "Please choose one of the buttons below, or press 1, 2, or 3.", "agent": "guardian"})
+            await self.call.room.send_phone("senior", {
+                "type": "agent_say",
+                "text": "Please choose one of the buttons below, or press 1, 2, or 3.",
+                "agent": "guardian", "playback": "speech",
+            })
         else:
             await self.backend.on_user_text(text)
 

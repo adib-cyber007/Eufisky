@@ -17,6 +17,7 @@ from app.config import settings
 
 URL = "wss://agents.assemblyai.com/v1/ws"
 START_TIMEOUT = 3.0
+WATCHDOG_DELAY = 5.0
 _END = object()
 
 
@@ -187,7 +188,7 @@ class VoiceAgentBackend:
         """Resolve a text turn through the LLM chain if Voice Agent does not choose a tool."""
 
         try:
-            await asyncio.sleep(5)
+            await asyncio.sleep(WATCHDOG_DELAY)
             if self.closed or self._tool_count != expected_count:
                 return
             backup = LLMBackend()
@@ -207,7 +208,11 @@ class VoiceAgentBackend:
                     event = await asyncio.wait_for(anext(events), timeout=0.2)
                 except (StopAsyncIteration, asyncio.TimeoutError):
                     break
-                await self.queue.put(event)
+                # The backup is decision-only while the Voice Agent socket is
+                # still open. Never mix its synthetic speech with late Voice
+                # Agent PCM from the same turn.
+                if event.get("type") != "say":
+                    await self.queue.put(event)
                 if event.get("type") == "tool_call":
                     self._tool_count += 1
                     chose_tool = True
@@ -220,7 +225,8 @@ class VoiceAgentBackend:
                 await anext(terminal_events)  # duplicate greeting
                 await terminal.on_user_text(text)
                 async for event in terminal_events:
-                    await self.queue.put(event)
+                    if event.get("type") != "say":
+                        await self.queue.put(event)
                     if event.get("type") == "tool_call":
                         self._tool_count += 1
                         break
