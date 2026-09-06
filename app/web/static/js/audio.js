@@ -38,11 +38,18 @@
 
     consume(floatSamples, sourceRate) {
       const samples = this.downsample(floatSamples, sourceRate);
-      this.pending.push(...samples);
       let peak = 0;
       for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
-      if (peak > 0.08 && window.speechSynthesis.speaking) window.speechSynthesis.cancel();
       this.onLevel(Math.min(1, peak * 2.5));
+
+      // Do not feed Eufisky's own speaker output back into STT. The old
+      // peak-based barge-in cancelled speech synthesis as soon as the mic
+      // heard the agent, making voice replies appear as captions but sound
+      // silent. Capture resumes automatically when playback finishes.
+      const pcmOutputPlaying = this.context && this.context.currentTime < this.playAt;
+      if (window.speechSynthesis.speaking || pcmOutputPlaying) return;
+
+      this.pending.push(...samples);
       while (this.pending.length >= FRAME_SAMPLES) {
         const frame = this.pending.splice(0, FRAME_SAMPLES);
         const pcm = new Int16Array(FRAME_SAMPLES);

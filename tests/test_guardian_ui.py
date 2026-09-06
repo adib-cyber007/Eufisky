@@ -15,3 +15,5 @@ def test_guardian_controls_are_rendered() -> None:
     assert all(label in family for label in ("Resume caller", "End call"))
     assert "Guardian is with Margaret" in dashboard and "Join call" in dashboard
     assert "holdMusic" in audio and "setInterval" in audio
+    assert "window.speechSynthesis.speaking || pcmOutputPlaying" in audio
+    assert "peak > 0.08 && window.speechSynthesis.speaking" not in audio
