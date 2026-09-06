@@ -1,18 +1,60 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Margaret’s phone — Eufisky</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Margaret’s phone — Eufisky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css?v=6">
+</head>
 <body class="phone-page senior-theme" data-role="senior">
   <main class="phone-shell">
-    <header class="phone-header"><a class="back-link" href="/">Eufisky</a><span class="room-pill">Room <b data-room>demo</b></span></header>
+    <header class="phone-header">
+      <a class="back-link" href="/"><span class="brand-mark" aria-hidden="true">E</span>Eufisky</a>
+      <span class="room-pill">Room <b data-room>demo</b></span>
+    </header>
     <section class="phone-display incoming-display">
-      <p class="phone-owner">Margaret’s phone</p><h1 id="status-title">Your line is ready</h1>
-      <p id="status-copy">Incoming calls will appear here.</p><p id="badge" class="badge neutral">Ready</p>
-      <p id="caption" class="caption" aria-live="polite"></p><div id="hold" class="hold-banner" hidden>Caller is on hold</div>
+      <p class="phone-owner">Margaret’s phone</p>
+      <h1 id="status-title">Your line is ready</h1>
+      <p id="status-copy">Incoming calls will appear here.</p>
+      <p id="badge" class="badge neutral">Ready</p>
+      <p id="caption" class="caption" aria-live="polite"></p>
+      <div id="hold" class="hold-banner" hidden>Caller is on hold</div>
       <audio id="chime" preload="auto" aria-hidden="true"></audio>
     </section>
-    <section class="phone-controls"><div class="call-actions"><button id="answer" class="button call" type="button" hidden>Answer</button><button id="decline" class="button secondary" type="button" hidden>Decline</button><button id="hangup" class="button end" type="button" disabled>Hang up</button></div></section>
-    <section id="guardian-controls" class="guardian-controls" hidden><p>Eufisky paused the caller. What would you like to do?</p><div><button data-guardian="end" class="button end" type="button">End the call</button><button data-guardian="family" class="button call" type="button">Bring in Sarah</button><button data-guardian="continue" class="button secondary" type="button">Continue the call</button></div><small>Keypad: 1 end · 2 Sarah · 3 continue</small></section>
-    <section class="talk-panel"><div class="meter-row"><button id="mic-toggle" class="mic-toggle" type="button" aria-pressed="false">Mic OFF</button><div class="meter" aria-label="Microphone level"><i id="meter-fill"></i></div></div><form id="text-form"><label for="text-talk">Type what you’d say</label><div class="text-send"><input id="text-talk" autocomplete="off" placeholder="Hello, who is this?"><button type="submit">Say it</button></div></form></section>
+    <section class="phone-controls">
+      <div class="call-actions">
+        <button id="answer" class="button call" type="button" hidden>Answer</button>
+        <button id="decline" class="button secondary" type="button" hidden>Decline</button>
+        <button id="hangup" class="button end" type="button" disabled>Hang up</button>
+      </div>
+    </section>
+    <section id="guardian-controls" class="guardian-controls" hidden>
+      <p>Eufisky paused the caller. What would you like to do?</p>
+      <div>
+        <button data-guardian="end" class="button end" type="button">End the call</button>
+        <button data-guardian="family" class="button call" type="button">Bring in Sarah</button>
+        <button data-guardian="continue" class="button secondary" type="button">Continue the call</button>
+      </div>
+      <small>Keypad: 1 end · 2 Sarah · 3 continue</small>
+    </section>
+    <section class="talk-panel">
+      <div class="meter-row">
+        <button id="mic-toggle" class="mic-toggle" type="button" aria-pressed="false">Mic OFF</button>
+        <div class="meter" aria-label="Microphone level"><i id="meter-fill"></i></div>
+      </div>
+      <form id="text-form">
+        <label for="text-talk">Type what you’d say</label>
+        <div class="text-send">
+          <input id="text-talk" autocomplete="off" placeholder="Hello, who is this?">
+          <button type="submit">Say it</button>
+        </div>
+      </form>
+    </section>
   </main>
-  <script src="/static/js/audio.js"></script><script src="/static/js/phone.js"></script>
-</body></html>
+  <script src="/static/js/audio.js"></script>
+  <script src="/static/js/phone.js"></script>
+</body>
+</html>

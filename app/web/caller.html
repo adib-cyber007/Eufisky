@@ -1,21 +1,57 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Caller phone — Eufisky</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Caller phone — Eufisky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css?v=6">
+</head>
 <body class="phone-page" data-role="caller">
   <main class="phone-shell">
-    <header class="phone-header"><a class="back-link" href="/">Eufisky</a><span class="room-pill">Room <b data-room>demo</b></span></header>
+    <header class="phone-header">
+      <a class="back-link" href="/"><span class="brand-mark" aria-hidden="true">E</span>Eufisky</a>
+      <span class="room-pill">Room <b data-room>demo</b></span>
+    </header>
     <section class="phone-display">
-      <p class="phone-owner">Caller phone</p><h1 id="status-title">Ready to call</h1>
-      <p id="status-copy">Choose the caller ID Margaret will see.</p><p id="badge" class="badge neutral">Ready</p>
-      <p id="caption" class="caption" aria-live="polite"></p><div id="hold" class="hold-banner" hidden>On hold</div>
+      <p class="phone-owner">Caller phone</p>
+      <h1 id="status-title">Ready to call</h1>
+      <p id="status-copy">Choose the caller ID Margaret will see.</p>
+      <p id="badge" class="badge neutral">Ready</p>
+      <p id="caption" class="caption" aria-live="polite"></p>
+      <div id="hold" class="hold-banner" hidden>On hold</div>
     </section>
     <section class="phone-controls">
       <label for="caller-id">Caller ID</label>
-      <select id="caller-id"><option value="+15550100101">Sarah — trusted</option><option value="+15550100102">Walgreens — trusted</option><option value="+15550199321">Unknown caller</option><option value="custom">Custom number</option></select>
+      <select id="caller-id">
+        <option value="+15550100101">Sarah — trusted</option>
+        <option value="+15550100102">Walgreens — trusted</option>
+        <option value="+15550199321">Unknown caller</option>
+        <option value="custom">Custom number</option>
+      </select>
       <input id="custom-number" class="custom-number" type="tel" placeholder="+1 555…" hidden>
-      <div class="call-actions"><button id="dial" class="button call" type="button">Dial Margaret</button><button id="hangup" class="button end" type="button" disabled>Hang up</button></div>
+      <div class="call-actions">
+        <button id="dial" class="button call" type="button">Dial Margaret</button>
+        <button id="hangup" class="button end" type="button" disabled>Hang up</button>
+      </div>
     </section>
-    <section class="talk-panel"><div class="meter-row"><button id="mic-toggle" class="mic-toggle" type="button" aria-pressed="false">Mic OFF</button><div class="meter" aria-label="Microphone level"><i id="meter-fill"></i></div></div><form id="text-form"><label for="text-talk">Type what you’d say</label><div class="text-send"><input id="text-talk" autocomplete="off" placeholder="Hello Margaret…"><button type="submit">Say it</button></div></form></section>
+    <section class="talk-panel">
+      <div class="meter-row">
+        <button id="mic-toggle" class="mic-toggle" type="button" aria-pressed="false">Mic OFF</button>
+        <div class="meter" aria-label="Microphone level"><i id="meter-fill"></i></div>
+      </div>
+      <form id="text-form">
+        <label for="text-talk">Type what you’d say</label>
+        <div class="text-send">
+          <input id="text-talk" autocomplete="off" placeholder="Hello Margaret…">
+          <button type="submit">Say it</button>
+        </div>
+      </form>
+    </section>
   </main>
-  <script src="/static/js/audio.js"></script><script src="/static/js/phone.js"></script>
-</body></html>
+  <script src="/static/js/audio.js"></script>
+  <script src="/static/js/phone.js"></script>
+</body>
+</html>
