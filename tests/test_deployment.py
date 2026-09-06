@@ -65,4 +65,5 @@ def test_public_tool_rejects_invalid_origins(value: str) -> None:
 
 def test_landing_explains_free_host_cold_start() -> None:
     landing = (PROJECT_ROOT / "app" / "web" / "index.html").read_text(encoding="utf-8")
+    assert 'id="cold-start-hint"' in landing
     assert "first load after a quiet period may take about 40 seconds" in landing

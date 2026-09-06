@@ -5,6 +5,10 @@ Eufisky is a browser-based simulation of a voice AI agent that guards an older a
 
 The current build includes the full phone-room demo, seeded dashboard history and messages, post-call batch analysis with reliable local fallbacks, and a microphone-free Replay Mode.
 
+## Live demo
+
+[Open Eufisky](https://eufisky.onrender.com) or use the direct [Caller](https://eufisky.onrender.com/caller?room=demo), [Senior](https://eufisky.onrender.com/senior?room=demo), [Family](https://eufisky.onrender.com/family?room=demo), and [Dashboard](https://eufisky.onrender.com/dashboard?room=demo) pages. All phones participating in a call must use the same room name.
+
 ## Run locally
 
 ```powershell
@@ -26,11 +30,11 @@ The hosted demo uses Render's temporary `/tmp` storage for SQLite and call recor
 A free service can sleep while unused. Its first page load may take roughly 40 seconds. About 15 minutes before presenting, keep this running in PowerShell and press `Ctrl+C` after the demo:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\warm.py https://YOUR-SERVICE.onrender.com
+.\.venv\Scripts\python.exe tools\warm.py https://eufisky.onrender.com
 ```
 
 After deployment, verify the full public HTTP, WebSocket, and Replay path with:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\smoke_public.py https://YOUR-SERVICE.onrender.com
+.\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com
 ```
