@@ -40,7 +40,7 @@ What changed:
 
 Changed files: `README.md`; `app/agent/frontdoor.py`; `app/agent/guardian.py`; `app/agent/voice_agent_backend.py`; `app/phone/calls.py`; `app/phone/protocol.md`; `app/phone/ws.py`; `app/session/state_machine.py`; `app/web/caller.html`; `app/web/senior.html`; `app/web/family.html`; `app/web/dashboard.html`; `app/web/static/css/app.css`; `app/web/static/js/audio.js`; `app/web/static/js/phone.js`; `app/web/static/js/dashboard.js`; `docs/DEMO_SCRIPT.md`; `tools/smoke_public.py`; `tests/test_calls.py`; `tests/test_deployment.py`; `tests/test_replay.py`; `tests/test_smoke.py`; `tests/test_state_machine.py`; `tests/test_voice_agent_backend.py`; and `STATE.md`.
 
-Verification: `node --check` passed for all three changed JavaScript files. `.\.venv\Scripts\python.exe -m pytest -q` passes all 77 tests. After the prior Render deployment, `.\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com` passed health/database, all five pages, the production Dashboard WebSocket room acknowledgement, Replay risk/transcript/state/tool events, and replay completion. New microphone-path coverage asserts Front Door PCM reaches the live Voice Agent exactly once without duplicate finalized text, Guardian STT text is suppressed while live PCM is active, fallback/typed text still works, and the caller gets at least one second of silence before the agent may take the turn.
+Verification: `node --check` passed for all three changed JavaScript files. `.\.venv\Scripts\python.exe -m pytest -q` passes all 77 tests. After the prior Render deployment, `.\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com` passed health/database, all five pages, the production Dashboard WebSocket room acknowledgement, Replay risk/transcript/state/tool events, and replay completion. New microphone-path coverage asserts Front Door PCM reaches the live Voice Agent exactly once without duplicate finalized text, Guardian STT text is suppressed while live PCM is active, fallback/typed text still works, and the caller gets at least one second of silence before the agent may take the turn. On 2026-09-07, the owner completed the deployed two-device phone/laptop voice test and reported `voice test worked`, confirming that Front Door and Guardian no longer interrupt with overlapping or duplicate voices.
 
 Environment variables are unchanged. Local `.env`: `ASSEMBLYAI_API_KEY`, optional `GROQ_API_KEY`, optional `GEMINI_API_KEY`, `AGENT_BACKEND`, `SENIOR_NAME`, and `FAMILY_NAME`. Render additionally supplies `PORT` and `RENDER`. Deployed health reports the AssemblyAI key present and `AGENT_BACKEND=voice_agent`; no missing/expired environment variable was identified.
 
@@ -56,16 +56,8 @@ Deployed URLs: `https://eufisky.onrender.com/caller?room=test1`, `https://eufisk
 
 # HUMAN ACTIONS REQUIRED NOW
 
-1. On the laptop, open `https://eufisky.onrender.com/dashboard?room=test1`. Wait until the top status says **Live · room test1**.
-2. On the laptop, open `https://eufisky.onrender.com/senior?room=test1`. Confirm its header says **Room test1 • connected**. Optionally open `https://eufisky.onrender.com/family?room=test1` and confirm the same label.
-3. On the phone, open `https://eufisky.onrender.com/caller?room=test1`. Confirm the header says **Room test1 • connected** before touching Dial. If any page says **default room**, stop and reopen the exact link above.
-4. Choose **Unknown caller**, turn **Mic ON**, allow microphone access, and tap **Dial Margaret**. Success means Front Door is audible only once and the laptop Senior tab rings with **Answer** and **Decline**.
-5. Answer on the Senior tab. On the phone say: “This is Michael from Medicare. Your benefits will be suspended today unless you verify your account. Please read me the number on your Medicare card.” Success means Dashboard changes in real time, risk rises, and Guardian places Caller on hold.
-6. While Guardian speaks privately to Margaret, listen on both devices. Success means there is never more than one agent voice at once; the phone hears hold music, not Guardian, and Senior hears one Guardian voice.
-7. Click **Bring in Sarah** or **End the call**. Then open Dashboard -> **History**. Success means the new completed call appears.
-8. During both Front Door and Guardian, speak a complete sentence with a short natural pause in the middle. Success means the agent waits for you to finish and only one agent voice answers.
-9. Reply with `two-device test worked` or name the single screen/step that failed.
+None.
 
 # BLOCKERS
 
-The automated code, WebSocket, persistence, and rendered-browser checks are complete. The only remaining check is inherently physical: the owner must confirm on the deployed phone/laptop microphone and speakers that Front Door and Guardian wait through natural pauses and that no second voice is audible. Recommendation: perform the nine steps above after Render finishes deploying the pushed commit.
+None. Automated verification and the deployed two-device physical voice test are complete.
