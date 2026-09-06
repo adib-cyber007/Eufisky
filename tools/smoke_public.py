@@ -73,7 +73,10 @@ async def run(base_url: str) -> None:
         )
         async with websockets.connect(ws_url, open_timeout=30) as socket:
             first = json.loads(await asyncio.wait_for(socket.recv(), timeout=20))
-            if first.get("type") != "state":
+            if first != {"type": "registered", "role": "dashboard", "room": room}:
+                raise RuntimeError("dashboard WebSocket did not confirm its room registration")
+            initial = json.loads(await asyncio.wait_for(socket.recv(), timeout=20))
+            if initial.get("type") != "state":
                 raise RuntimeError("dashboard WebSocket did not send its initial state")
             print("PASS dashboard WebSocket handshake")
 
