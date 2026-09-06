@@ -17,6 +17,17 @@ def test_connect_at_40_is_converted_to_message() -> None:
     }
 
 
+def test_always_ring_first_skips_only_score_override() -> None:
+    result = decide(
+        "connect_caller",
+        {"caller_name": "Pat", "purpose": "urgent account"},
+        90,
+        always_ring_first=True,
+    )
+    assert result.action == "connect_caller"
+    assert result.result["status"] == "connecting"
+
+
 def test_message_and_decline_are_normalized() -> None:
     message = decide("take_message", {"caller_name": "", "message": "Call me"}, 0)
     declined = decide("decline", {"reason": "sales"}, 0)

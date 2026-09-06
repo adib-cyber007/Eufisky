@@ -8,6 +8,8 @@
   let active = false;
   let micOn = false;
   let currentState = "IDLE";
+  const noticeQueue = [];
+  let noticeVisible = false;
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   const socket = new WebSocket(`${scheme}://${location.host}/ws/phone`);
   socket.binaryType = "arraybuffer";
@@ -28,6 +30,24 @@
   function setCopy(title, copy) {
     $("#status-title").textContent = title;
     $("#status-copy").textContent = copy;
+  }
+
+  function showNextNotice() {
+    if (role !== "senior" || noticeVisible || !noticeQueue.length) return;
+    const message = noticeQueue.shift();
+    const ending = message.kind === "message_taken" ? "A message was saved." : "The call was declined.";
+    const purpose = String(message.purpose || "No details were provided").replace(/[.!?]+$/, "");
+    $("#screening-notice-copy").textContent = `A call from ${message.caller_label || "an unknown caller"} was screened. ${purpose}. ${ending}`;
+    $("#screening-notice").hidden = false;
+    noticeVisible = true;
+    audio.notice().catch(() => {});
+  }
+
+  function dismissNotice() {
+    if (role !== "senior") return;
+    $("#screening-notice").hidden = true;
+    noticeVisible = false;
+    showNextNotice();
   }
 
   function renderState(message) {
@@ -84,6 +104,10 @@
       audio.speak(message.text);
     }
     if (message.type === "agent_caption") $("#caption").textContent = message.text;
+    if (message.type === "notice" && role === "senior") {
+      noticeQueue.push(message);
+      showNextNotice();
+    }
     if (message.type === "hold") {
       $("#hold").hidden = !message.on;
       if (role === "caller") {
@@ -123,6 +147,7 @@
   if ($("#answer")) $("#answer").addEventListener("click", () => send("answer"));
   if ($("#decline")) $("#decline").addEventListener("click", () => send("hangup"));
   if ($("#hangup")) $("#hangup").addEventListener("click", () => send("hangup"));
+  if ($("#dismiss-screening-notice")) $("#dismiss-screening-notice").addEventListener("click", dismissNotice);
   document.querySelectorAll("[data-guardian]").forEach((button) => button.addEventListener("click", () => send("guardian_action", { action: button.dataset.guardian })));
   $("#mic-toggle").addEventListener("click", async () => {
     try {

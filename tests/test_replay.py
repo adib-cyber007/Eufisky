@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from fastapi.testclient import TestClient
 import pytest
 
 from app import db
+from app.main import app
 from app.replay import load_replay, play_events
 from app.rooms import rooms
+from tools.record_replay import export_call
 
 
 class FakeDashboard:
@@ -52,13 +55,54 @@ async def test_replay_publishes_in_order_at_selected_speed(
 
     assert delays == [0.5, 1.0]
     assert [message.get("status") for message in socket.messages if message["type"] == "replay"] == [
-        "started", "complete"
+        "started", "completed"
     ]
-    published = [message for message in socket.messages if message["type"] in {"state", "caption"}]
+    published = [message for message in socket.messages if message["type"] in {"state", "transcript"}]
     assert [message["t_ms"] for message in published] == [1000, 3000]
     assert all(message["replay"] is True for message in published)
+    assert published[1]["final"] is True
 
 
 def test_replay_rejects_paths_outside_data() -> None:
     with pytest.raises(ValueError):
         load_replay("../secret.json")
+
+
+def test_seeded_call_export_restores_risk_and_transcript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "seeded-export.db")
+    db.init_db()
+    seeded = next(
+        call for call in db.list_calls("demo")
+        if call["from_phone"] == "+15550198740"
+    )
+    output = tmp_path / "seeded.json"
+    replay = export_call(str(seeded["id"]), output)
+    event_types = {event["type"] for event in replay["events"]}
+    assert {"call", "risk", "transcript", "state", "level", "tool"} <= event_types
+    assert max(event.get("score", 0) for event in replay["events"]) == 96
+    assert any(event.get("speaker") == "senior" for event in replay["events"])
+
+
+def test_replay_endpoint_delivers_complete_story_to_websocket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "replay-websocket.db")
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws/dashboard?room=replay-websocket") as socket:
+            assert socket.receive_json()["trigger"] == "snapshot"
+            response = client.post(
+                "/api/rooms/replay-websocket/replay",
+                json={"file": "demo_call.json", "speed": 20},
+            )
+            assert response.status_code == 200
+            received: list[dict] = []
+            while True:
+                message = socket.receive_json()
+                received.append(message)
+                if message.get("type") == "replay" and message.get("status") == "completed":
+                    break
+    event_types = {message["type"] for message in received}
+    assert {"risk", "transcript", "state", "tool", "replay"} <= event_types
+    assert any(message.get("status") == "completed" for message in received)

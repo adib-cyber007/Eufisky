@@ -14,3 +14,5 @@ The current build includes the full phone-room demo, seeded dashboard history an
 Open <http://localhost:8000> and follow the guided steps. The direct demo pages are `/caller?room=demo`, `/senior?room=demo`, `/family?room=demo`, and `/dashboard?room=demo`. The health check is <http://localhost:8000/api/health>.
 
 On the dashboard, click **▶ Replay demo call** for a complete no-microphone run. See `docs/DEMO_SCRIPT.md` for the exact three-minute presentation, `STATE.md` for the current handoff snapshot, and `docs/PROJECT_CONTEXT.md` for the product contract.
+
+If a family is worried that an urgent legitimate caller could be filtered into a message, open **Dashboard → Settings** and turn on **Always ring me first, even for calls that look risky**. It defaults OFF to preserve the safer standard demo. When ON, Front Door still screens callers, but its score-based connection override is skipped; calls it attempts to connect ring Margaret and remain protected by the unchanged live monitoring and Guardian intervention.

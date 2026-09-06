@@ -68,6 +68,7 @@ class CallSession:
         self.caller_name = label
         self.purpose = ""
         self.claimed_org = ""
+        self.notice_sent = False
         self.dial_timeout: asyncio.Task[None] | None = None
         if self.monitored:
             for leg in ("caller", "senior"):
@@ -173,7 +174,12 @@ class CallController:
             return
         requested = str(event.get("name") or "")
         args = event.get("args") if isinstance(event.get("args"), dict) else {}
-        decision = decide(requested, args, score)
+        decision = decide(
+            requested,
+            args,
+            score,
+            always_ring_first=db.get_room_settings(call.room.room)["always_ring_first"],
+        )
         db.add_event(call.id, call.elapsed_ms, "front_door_decision", {
             "requested": requested, "executed": decision.action, "risk_score": score,
             "policy_override": decision.result.get("status") == "policy_override",
@@ -214,6 +220,7 @@ class CallController:
                 "type": "message", "call_id": call.id,
                 "caller_name": decision.args["caller_name"], "body": decision.args["message"],
             })
+        await self._screening_notice(call, decision.action, decision.args)
         await call.room.send_phone("caller", {
             "type": "agent_say", "text": decision.result["say"], "agent": "front_door"
         })
@@ -221,6 +228,29 @@ class CallController:
             await call.frontdoor.close()
         await asyncio.sleep(self.closing_delay)
         await self.hangup(call.room.room, decision.action)
+
+    async def _screening_notice(
+        self, call: CallSession, outcome: str, args: dict[str, Any]
+    ) -> None:
+        """Publish one calm visibility notice for a filtered Front Door outcome."""
+        if outcome not in {"take_message", "decline"} or call.notice_sent:
+            return
+        call.notice_sent = True
+        caller_label = str(args.get("caller_name") or call.caller_name or call.label)
+        purpose = str(args.get("message") or args.get("reason") or call.purpose or "No details provided")
+        callback_number = str(args.get("callback_number") or "")
+        notice = {
+            "type": "notice",
+            "t_ms": call.elapsed_ms,
+            "kind": "message_taken" if outcome == "take_message" else "declined",
+            "caller_label": caller_label,
+            "purpose": purpose,
+            "callback_number": callback_number,
+        }
+        await asyncio.gather(
+            call.room.send_phone("senior", notice),
+            call.room.broadcast_dashboard(notice),
+        )
 
     async def _senior_timeout(self, call: CallSession) -> None:
         try:

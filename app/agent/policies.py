@@ -13,13 +13,19 @@ class PolicyDecision:
     result: dict[str, Any]
 
 
-def decide(tool_name: str, args: dict[str, Any], risk_score: int) -> PolicyDecision:
+def decide(
+    tool_name: str,
+    args: dict[str, Any],
+    risk_score: int,
+    *,
+    always_ring_first: bool = False,
+) -> PolicyDecision:
     """Validate a single tool call and enforce the score-40 connection boundary."""
 
     if tool_name == "connect_caller":
         caller_name = str(args.get("caller_name") or "Unknown caller").strip()
         purpose = str(args.get("purpose") or "No purpose provided").strip()
-        if risk_score >= 40:
+        if risk_score >= 40 and not always_ring_first:
             message_args = {
                 "caller_name": caller_name,
                 "message": purpose,

@@ -79,6 +79,8 @@ def setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         for role, socket in sockets.items():
             registry.register_phone("demo", role, socket,
                                     "+15550199321" if role == "caller" else None)
+        sockets["dashboard"] = FakeSocket()
+        registry.register_dashboard("demo", sockets["dashboard"])
         backend = ScriptedBackend(tool, args)
         controller = CallController(
             registry, stt_factory=FakeSTT, backend_factory=lambda: backend,
@@ -109,7 +111,7 @@ async def test_connect_rings_introduces_and_bridges_with_seed(setup) -> None:
 
 @pytest.mark.asyncio
 async def test_take_message_persists_and_ends(setup) -> None:
-    controller, _ = setup("take_message", {
+    controller, sockets = setup("take_message", {
         "caller_name": "Unknown caller", "message": "Would not provide a name",
         "callback_number": "",
     })
@@ -118,16 +120,24 @@ async def test_take_message_persists_and_ends(setup) -> None:
     await asyncio.sleep(0.02)
     assert call.state == CallState.ENDED
     assert db.list_messages("demo")[0]["body"] == "Would not provide a name"
+    senior_notices = [item for item in sockets["senior"].json if item.get("type") == "notice"]
+    dashboard_notices = [item for item in sockets["dashboard"].json if item.get("type") == "notice"]
+    assert len(senior_notices) == len(dashboard_notices) == 1
+    assert senior_notices[0]["kind"] == "message_taken"
 
 
 @pytest.mark.asyncio
 async def test_decline_ends_without_message(setup) -> None:
-    controller, _ = setup("decline", {"reason": "sales"})
+    controller, sockets = setup("decline", {"reason": "sales"})
     call = await controller.dial("demo", "+15550199321")
     await controller.text("demo", "caller", "I'm selling extended car warranties")
     await asyncio.sleep(0.02)
     assert call.state == CallState.ENDED
     assert all(message["call_id"] != call.id for message in db.list_messages("demo"))
+    senior_notices = [item for item in sockets["senior"].json if item.get("type") == "notice"]
+    dashboard_notices = [item for item in sockets["dashboard"].json if item.get("type") == "notice"]
+    assert len(senior_notices) == len(dashboard_notices) == 1
+    assert senior_notices[0]["kind"] == "declined"
 
 
 @pytest.mark.asyncio
@@ -141,3 +151,22 @@ async def test_high_risk_connect_is_overridden(setup) -> None:
     assert call.state == CallState.ENDED
     assert db.get_call(call.id)["front_door_outcome"] == "take_message"
     assert db.list_messages("demo")
+
+
+@pytest.mark.asyncio
+async def test_always_ring_first_routes_high_risk_connect_to_senior(setup) -> None:
+    controller, sockets = setup("connect_caller", {
+        "caller_name": "Alex", "purpose": "pay the IRS with gift cards immediately"
+    })
+    db.update_room_settings("demo", always_ring_first=True)
+    call = await controller.dial("demo", "+15550199321")
+    await controller.text(
+        "demo", "caller",
+        "This is Alex from the IRS. Pay with gift cards immediately or police will arrest you",
+    )
+    await asyncio.sleep(0.02)
+    assert call.state == CallState.DIALING_SENIOR
+    assert db.get_call(call.id)["front_door_outcome"] == "connect_caller"
+    assert any(item.get("type") == "ring" for item in sockets["senior"].json)
+    assert not any(item.get("type") == "notice" for item in sockets["senior"].json)
+    await controller.hangup("demo")

@@ -49,11 +49,16 @@ async def play_events(
         if delay:
             await sleep(delay)
         event = dict(saved)
+        if event.get("type") == "caption":
+            event["type"] = "transcript"
+            event["speaker"] = str(event.get("speaker") or event.get("role") or "caller")
+            event["final"] = bool(event.get("final", True))
+            event.pop("role", None)
         event["replay"] = True
         event.setdefault("call_id", "replay-demo")
         await live.broadcast_dashboard(event)
         previous_ms = t_ms
-    await live.broadcast_dashboard({"type": "replay", "status": "complete"})
+    await live.broadcast_dashboard({"type": "replay", "status": "completed"})
 
 
 def start(room: str, file_name: str = "demo_call.json", speed: float = 1.0) -> dict[str, Any]:

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/app.css?v=6">
+  <link rel="stylesheet" href="/static/css/app.css?v=7">
 </head>
 <body class="dashboard-page">
   <main class="dashboard-shell">
@@ -17,8 +17,9 @@
       <nav class="tabs" aria-label="Dashboard sections">
         <button class="active" data-tab="live">Live</button>
         <button data-tab="contacts">Contacts</button>
-        <button data-tab="messages">Messages</button>
+        <button data-tab="messages">Messages <span id="message-unread" class="unread-badge" aria-label="unread messages" hidden>0</span></button>
         <button data-tab="history">History</button>
+        <button data-tab="settings">Settings</button>
       </nav>
       <div class="sidebar-foot">
         <p>Protected line</p>
@@ -104,11 +105,11 @@
           <select id="contact-status">
             <option value="trusted">Trusted</option>
             <option value="blocked">Blocked</option>
-            <option value="pending">Pending</option>
           </select>
           <button class="button call" type="submit">Add contact</button>
         </form>
-        <div id="contact-list" class="data-list"></div>
+        <p id="contact-feedback" class="action-feedback" role="status" aria-live="polite"></p>
+        <div id="contact-list" class="data-list" aria-live="polite"></div>
       </section>
       <section id="panel-messages" class="tab-panel">
         <div class="section-heading">
@@ -130,8 +131,26 @@
         </div>
         <div id="history-list" class="incident-list"></div>
       </section>
+      <section id="panel-settings" class="tab-panel">
+        <div class="section-heading">
+          <div>
+            <h2>Settings</h2>
+            <p>Choose how Margaret’s protected line handles risky screened calls.</p>
+          </div>
+        </div>
+        <section class="settings-card">
+          <label class="setting-toggle" for="always-ring-first">
+            <span>
+              <strong>Always ring me first, even for calls that look risky</strong>
+              <small>Off is recommended for the standard demo. When on, risky callers still receive live monitoring and Guardian protection.</small>
+            </span>
+            <input id="always-ring-first" type="checkbox" role="switch">
+          </label>
+          <p id="settings-feedback" class="action-feedback" role="status" aria-live="polite"></p>
+        </section>
+      </section>
     </div>
   </main>
-  <script src="/static/js/dashboard.js?v=5"></script>
+  <script src="/static/js/dashboard.js?v=6"></script>
 </body>
 </html>

@@ -49,6 +49,10 @@ class ReplayRequest(BaseModel):
     speed: float = 2.0
 
 
+class RoomSettingsPatch(BaseModel):
+    always_ring_first: bool
+
+
 @app.get("/api/health")
 async def health() -> dict[str, bool | str]:
     """Report startup configuration without exposing any secret values."""
@@ -94,6 +98,18 @@ async def new_room() -> dict[str, str]:
 @app.get("/api/rooms/{room}/contacts")
 async def contacts_list(room: str) -> list[dict]:
     return db.list_contacts(room)
+
+
+@app.get("/api/rooms/{room}/settings")
+async def settings_get(room: str) -> dict[str, bool]:
+    return db.get_room_settings(room)
+
+
+@app.patch("/api/rooms/{room}/settings")
+async def settings_patch(room: str, room_settings: RoomSettingsPatch) -> dict[str, bool]:
+    return db.update_room_settings(
+        room, always_ring_first=room_settings.always_ring_first
+    )
 
 
 @app.post("/api/rooms/{room}/contacts", status_code=201)

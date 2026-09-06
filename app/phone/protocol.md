@@ -8,7 +8,10 @@ sends `answer{}`. Any phone can send `hangup{}`, `text{text}`, `mic{on}`, or
 mono, 16 kHz. The server sends `state{call_state,badge,monitored}`,
 `ring{from_label,trusted,reason?}`, `agent_say{text,agent}`, `hold{on}`, `tone{name}`,
 `guardian_controls{visible,family_name?,fallback?}`,
-`ended{reason}`, or binary PCM16. A JSON `ping` is sent every 15 seconds.
+`notice{t_ms,kind,caller_label,purpose,callback_number}`, `ended{reason}`, or binary
+PCM16. A JSON `ping` is sent every 15 seconds. `notice` is sent to the Senior
+phone for each Front Door `take_message` or `decline` outcome and is also
+published once on the dashboard feed.
 Clients may encode an event as `{"type":"text","text":"hello"}` or the
 equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
 
@@ -45,4 +48,5 @@ equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
    risk and outcome, applies the high-risk block policy, and emits `ended`.
 
 Dashboard clients connect to `/ws/dashboard?room=` and receive the documented
-`risk`, `transcript`, `state`, `level`, `tool`, `guardian`, and `call` events.
+`risk`, `transcript`, `state`, `level`, `tool`, `guardian`, `call`, and `notice`
+events.

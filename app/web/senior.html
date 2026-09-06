@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/app.css?v=6">
+  <link rel="stylesheet" href="/static/css/app.css?v=7">
 </head>
 <body class="phone-page senior-theme" data-role="senior">
   <main class="phone-shell">
@@ -15,6 +15,13 @@
       <a class="back-link" href="/"><span class="brand-mark" aria-hidden="true">E</span>Eufisky</a>
       <span class="room-pill">Room <b data-room>demo</b></span>
     </header>
+    <section id="screening-notice" class="screening-notice" role="status" aria-live="polite" hidden>
+      <div>
+        <strong>Screened call update</strong>
+        <p id="screening-notice-copy"></p>
+      </div>
+      <button id="dismiss-screening-notice" type="button" aria-label="Dismiss screened call update">Dismiss</button>
+    </section>
     <section class="phone-display incoming-display">
       <p class="phone-owner">Margaret’s phone</p>
       <h1 id="status-title">Your line is ready</h1>
@@ -54,7 +61,7 @@
       </form>
     </section>
   </main>
-  <script src="/static/js/audio.js"></script>
-  <script src="/static/js/phone.js"></script>
+  <script src="/static/js/audio.js?v=7"></script>
+  <script src="/static/js/phone.js?v=7"></script>
 </body>
 </html>

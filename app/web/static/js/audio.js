@@ -133,6 +133,23 @@
       });
     }
 
+    async notice() {
+      const context = await this.ensureContext();
+      [440, 554].forEach((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime + index * 0.13;
+        oscillator.frequency.value = frequency;
+        oscillator.type = "sine";
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.045, start + 0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + 0.13);
+      });
+    }
+
     async holdMusic(on) {
       if (!on) {
         if (this.holdTimer) clearInterval(this.holdTimer);

@@ -8,6 +8,7 @@
   let socket = null;
   let reconnectTimer = null;
   let reconnectAttempt = 0;
+  let unreadMessages = 0;
 
   document.querySelectorAll("[data-room]").forEach((node) => { node.textContent = room; });
 
@@ -29,9 +30,15 @@
     document.querySelectorAll(".tab-panel").forEach((panel) => {
       panel.classList.toggle("active", panel.id === `panel-${name}`);
     });
-    if (name === "contacts") loadContacts();
-    if (name === "messages") loadMessages();
-    if (name === "history") loadHistory();
+    if (name === "contacts") return loadContacts();
+    if (name === "messages") {
+      unreadMessages = 0;
+      updateUnreadBadge();
+      return loadMessages();
+    }
+    if (name === "history") return loadHistory();
+    if (name === "settings") return loadSettings();
+    return Promise.resolve();
   }
 
   document.querySelectorAll("[data-tab]").forEach((button) => {
@@ -46,29 +53,90 @@
     return response.status === 204 ? null : response.json();
   }
 
+  function updateUnreadBadge() {
+    const badge = $("#message-unread");
+    badge.textContent = String(unreadMessages);
+    badge.hidden = unreadMessages === 0;
+  }
+
+  async function loadSettings() {
+    try {
+      const roomSettings = await request("/settings");
+      $("#always-ring-first").checked = Boolean(roomSettings.always_ring_first);
+      $("#settings-feedback").textContent = "";
+    } catch (error) {
+      $("#settings-feedback").textContent = "Settings could not be loaded.";
+      $("#settings-feedback").classList.add("error-copy");
+    }
+  }
+
+  function contactFeedback(message, error = false) {
+    const feedback = $("#contact-feedback");
+    feedback.textContent = message;
+    feedback.classList.toggle("error-copy", error);
+  }
+
+  async function changeContactStatus(contact, status, label) {
+    try {
+      await request(`/contacts/${contact.id}`, {
+        method: "PATCH", body: JSON.stringify({ status }),
+      });
+      contactFeedback(`${contact.label} is now ${label.toLowerCase()}.`);
+      await loadContacts();
+    } catch (error) {
+      contactFeedback(`${contact.label} could not be updated.`, true);
+    }
+  }
+
   function contactRow(contact) {
-    const row = element("article", "data-row");
-    const identity = element("div");
+    const row = element("article", "data-row contact-row");
+    const identity = element("div", "contact-identity");
     identity.append(element("strong", "", contact.label));
-    identity.append(element("span", "", `${contact.phone} · ${contact.status}`));
+    const details = element("div", "contact-details");
+    details.append(element("span", "contact-phone", contact.phone));
+    details.append(element("span", `status-badge ${contact.status}`, contact.status));
+    identity.append(details);
+    if (contact.status === "blocked" && contact.related_call_id) {
+      const reason = element("p", "block-reason", contact.block_reason || "Blocked after a safety incident.");
+      const link = element("button", "incident-link", "View related incident");
+      link.type = "button";
+      link.addEventListener("click", async () => {
+        await activateTab("history");
+        const card = document.querySelector(`[data-call-id="${CSS.escape(contact.related_call_id)}"]`);
+        if (card) {
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          card.classList.add("incident-highlight");
+          setTimeout(() => card.classList.remove("incident-highlight"), 2200);
+        }
+      });
+      reason.append(" ", link);
+      identity.append(reason);
+    }
     const actions = element("div", "row-actions");
-    [["Trust", "trusted"], ["Block", "blocked"]].forEach(([label, status]) => {
+    const statusActions = [["Trust", "trusted"]];
+    if (contact.status === "trusted") statusActions.push(["Untrust", "pending"]);
+    statusActions.push(["Block", "blocked"]);
+    if (contact.status === "blocked") statusActions.push(["Unblock", "pending"]);
+    statusActions.forEach(([label, status]) => {
       const button = element("button", "", label);
       button.type = "button";
-      button.addEventListener("click", async () => {
-        await request(`/contacts/${contact.id}`, {
-          method: "PATCH", body: JSON.stringify({ status }),
-        });
-        loadContacts();
-      });
+      button.disabled = contact.status === status;
+      button.dataset.action = label.toLowerCase();
+      button.addEventListener("click", () => changeContactStatus(contact, status, status));
       actions.append(button);
     });
     const remove = element("button", "", "Delete");
     remove.type = "button";
     remove.dataset.delete = "";
     remove.addEventListener("click", async () => {
-      await request(`/contacts/${contact.id}`, { method: "DELETE" });
-      loadContacts();
+      if (!window.confirm(`Delete ${contact.label} from Contacts?`)) return;
+      try {
+        await request(`/contacts/${contact.id}`, { method: "DELETE" });
+        contactFeedback(`${contact.label} was deleted.`);
+        await loadContacts();
+      } catch (error) {
+        contactFeedback(`${contact.label} could not be deleted.`, true);
+      }
     });
     actions.append(remove);
     row.append(identity, actions);
@@ -80,6 +148,7 @@
     try {
       const contacts = await request("/contacts");
       list.replaceChildren(...contacts.map(contactRow));
+      if (!contacts.length) list.append(element("p", "empty", "No contacts yet."));
     } catch (error) {
       showError(list, "Contacts could not be loaded. Try Refresh.");
     }
@@ -157,6 +226,7 @@
     const summary = incident.summary || {};
     const peak = Number(call.peak_risk) || 0;
     const card = element("article", `incident-card ${riskBand(peak)}`);
+    card.dataset.callId = call.id;
     const header = element("header", "incident-header");
     const heading = element("div");
     heading.append(
@@ -389,6 +459,15 @@
       loadHistory();
     }
     if (message.type === "message") loadMessages();
+    if (message.type === "notice") {
+      const messagesOpen = $("[data-tab=\"messages\"]").classList.contains("active");
+      if (!messagesOpen) {
+        unreadMessages += 1;
+        updateUnreadBadge();
+      } else {
+        loadMessages();
+      }
+    }
     if (message.type === "state") {
       $("#live-state").textContent = message.to || "IDLE";
       $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
@@ -427,15 +506,42 @@
 
   $("#contact-form").addEventListener("submit", async (event) => {
     event.preventDefault();
-    await request("/contacts", { method: "POST", body: JSON.stringify({
-      label: $("#contact-label").value, phone: $("#contact-phone").value,
-      status: $("#contact-status").value,
-    }) });
-    event.target.reset();
-    loadContacts();
+    const label = $("#contact-label").value.trim();
+    try {
+      await request("/contacts", { method: "POST", body: JSON.stringify({
+        label, phone: $("#contact-phone").value.trim(),
+        status: $("#contact-status").value,
+      }) });
+      event.target.reset();
+      contactFeedback(`${label} was added.`);
+      await loadContacts();
+    } catch (error) {
+      contactFeedback(`${label || "The contact"} could not be added.`, true);
+    }
   });
   $("#refresh-history").addEventListener("click", loadHistory);
   $("#refresh-messages").addEventListener("click", loadMessages);
+  $("#always-ring-first").addEventListener("change", async (event) => {
+    const toggle = event.target;
+    toggle.disabled = true;
+    try {
+      const saved = await request("/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ always_ring_first: toggle.checked }),
+      });
+      toggle.checked = Boolean(saved.always_ring_first);
+      $("#settings-feedback").classList.remove("error-copy");
+      $("#settings-feedback").textContent = toggle.checked
+        ? "On — screened risky calls will ring Margaret and remain monitored."
+        : "Off — the standard Front Door filtering policy is active.";
+    } catch (error) {
+      toggle.checked = !toggle.checked;
+      $("#settings-feedback").classList.add("error-copy");
+      $("#settings-feedback").textContent = "The setting could not be saved.";
+    } finally {
+      toggle.disabled = false;
+    }
+  });
   $("#guardian-join").addEventListener("click", async () => {
     await request("/calls/current/guardian/family", { method: "POST" });
   });
@@ -458,4 +564,5 @@
   loadContacts();
   loadMessages();
   loadHistory();
+  loadSettings();
 })();

@@ -17,7 +17,8 @@ SEED_PATH = DATA_DIR / "seed.json"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    always_ring_first INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,6 +83,12 @@ def init_db() -> None:
     """Create every documented table and seed the demo room."""
     with _connect() as connection:
         connection.executescript(SCHEMA)
+        _ensure_column(
+            connection,
+            "rooms",
+            "always_ring_first",
+            "INTEGER NOT NULL DEFAULT 0",
+        )
         _ensure_column(connection, "incidents", "redacted_audio", "TEXT")
         _ensure_column(
             connection,
@@ -255,13 +262,59 @@ def ensure_room(room: str) -> str:
     return room
 
 
+def get_room_settings(room: str) -> dict[str, bool]:
+    ensure_room(room)
+    with _connect() as connection:
+        row = connection.execute(
+            "SELECT always_ring_first FROM rooms WHERE id = ?", (room,)
+        ).fetchone()
+    return {"always_ring_first": bool(row["always_ring_first"]) if row else False}
+
+
+def update_room_settings(room: str, *, always_ring_first: bool) -> dict[str, bool]:
+    ensure_room(room)
+    with _connect() as connection:
+        connection.execute(
+            "UPDATE rooms SET always_ring_first = ? WHERE id = ?",
+            (int(always_ring_first), room),
+        )
+    return get_room_settings(room)
+
+
 def list_contacts(room: str) -> list[dict[str, Any]]:
     ensure_room(room)
     with _connect() as connection:
         rows = connection.execute(
             "SELECT * FROM contacts WHERE room = ? ORDER BY label COLLATE NOCASE", (room,)
         ).fetchall()
-    return [dict(row) for row in rows]
+        contacts = [dict(row) for row in rows]
+        for contact in contacts:
+            contact["related_call_id"] = None
+            contact["block_reason"] = None
+            if contact["status"] != "blocked":
+                continue
+            related = connection.execute(
+                """SELECT calls.id, calls.peak_risk, incidents.summary_json
+                   FROM calls
+                   JOIN incidents ON incidents.call_id = calls.id
+                   WHERE calls.room = ? AND calls.from_phone = ?
+                   ORDER BY calls.started_at DESC, incidents.id DESC
+                   LIMIT 1""",
+                (room, contact["phone"]),
+            ).fetchone()
+            if not related:
+                continue
+            contact["related_call_id"] = str(related["id"])
+            try:
+                summary = json.loads(related["summary_json"] or "{}")
+            except json.JSONDecodeError:
+                summary = {}
+            contact["block_reason"] = (
+                summary.get("summary")
+                or summary.get("outcome")
+                or f"High-risk call (peak risk {int(related['peak_risk'] or 0)})"
+            )
+    return contacts
 
 
 def create_contact(
