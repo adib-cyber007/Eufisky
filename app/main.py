@@ -17,6 +17,7 @@ from app.phone.calls import calls
 from app.phone.ws import dashboard_socket, phone_socket
 from app import replay as replay_mode
 from app.rooms import rooms
+from app.runtime_paths import recordings_dir
 
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
@@ -155,7 +156,8 @@ async def incident_audio(room: str, call_id: str) -> FileResponse:
     path = Path(str(value))
     path = path if path.is_absolute() else db.PROJECT_ROOT / path
     resolved = path.resolve()
-    if not resolved.is_relative_to(db.DATA_DIR.resolve()) or not resolved.exists():
+    allowed_roots = (db.DATA_DIR.resolve(), recordings_dir().resolve())
+    if not any(resolved.is_relative_to(root) for root in allowed_roots) or not resolved.exists():
         raise HTTPException(status_code=404, detail="Redacted audio not available")
     return FileResponse(resolved, media_type="audio/wav", filename=f"incident-{call_id}.wav")
 

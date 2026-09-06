@@ -19,10 +19,11 @@ import httpx
 from app import db
 from app.config import settings
 from app.rooms import rooms
+from app.runtime_paths import recordings_dir
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RECORDINGS_DIR = PROJECT_ROOT / "data" / "recordings"
+RECORDINGS_DIR = recordings_dir()
 PROMPT_PATH = Path(__file__).with_name("lemur_prompt.txt")
 API_BASE = "https://api.assemblyai.com"
 LLM_URL = "https://llm-gateway.assemblyai.com/v1/chat/completions"

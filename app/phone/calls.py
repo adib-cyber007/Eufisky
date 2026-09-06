@@ -23,8 +23,9 @@ from app.session.context import CallMonitor, guardian_context
 from app.session.events import EventPublisher
 from app.stt.assemblyai_stream import STTStream
 from app.postcall import pipeline as postcall
+from app.runtime_paths import PROJECT_ROOT, recordings_dir
 
-RECORDINGS_DIR = Path(__file__).resolve().parents[2] / "data" / "recordings"
+RECORDINGS_DIR = recordings_dir()
 
 
 class CallState(str, Enum):
@@ -72,9 +73,13 @@ class CallSession:
         self.dial_timeout: asyncio.Task[None] | None = None
         if self.monitored:
             for leg in ("caller", "senior"):
-                relative = Path("data") / "recordings" / f"{self.id}_{leg}.wav"
-                self.recording_paths[leg] = relative.as_posix()
-                self.recorders[leg] = WavWriter(RECORDINGS_DIR / f"{self.id}_{leg}.wav")
+                path = RECORDINGS_DIR / f"{self.id}_{leg}.wav"
+                try:
+                    stored_path = path.resolve().relative_to(PROJECT_ROOT).as_posix()
+                except ValueError:
+                    stored_path = str(path.resolve())
+                self.recording_paths[leg] = stored_path
+                self.recorders[leg] = WavWriter(path)
 
     @property
     def elapsed_ms(self) -> int:

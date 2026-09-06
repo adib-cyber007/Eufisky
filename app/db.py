@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any
 import uuid
 
+from app.runtime_paths import database_path
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
-DB_PATH = DATA_DIR / "eufisky.db"
+DB_PATH = database_path()
 SEED_PATH = DATA_DIR / "seed.json"
 
 SCHEMA = """
@@ -72,7 +74,7 @@ def _now() -> str:
 
 
 def _connect() -> sqlite3.Connection:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
