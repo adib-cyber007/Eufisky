@@ -27,6 +27,11 @@ class Fallback:
                 yield {}
 
 
+def test_voice_turn_waits_through_a_natural_caller_pause() -> None:
+    assert voice_module.TURN_MIN_SILENCE_MS >= 1000
+    assert voice_module.TURN_MAX_SILENCE_MS > voice_module.TURN_MIN_SILENCE_MS
+
+
 class DecisionOnlyBackup:
     provider = "decision-test"
 

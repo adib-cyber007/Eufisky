@@ -58,6 +58,15 @@ class FrontDoorSession:
             return max(0, raw - 15)
         return raw
 
+    @property
+    def uses_live_agent_audio(self) -> bool:
+        """True when PCM already supplies the agent's conversational input."""
+
+        return (
+            getattr(self.backend, "provider", "") == "voice_agent"
+            and callable(getattr(self.backend, "on_audio", None))
+        )
+
     async def start(self) -> None:
         try:
             await self.stream.start()
@@ -85,7 +94,11 @@ class FrontDoorSession:
                     call_event = WordEvent("caller", event.text, self.call.elapsed_ms, event.final)
                     await self._score_and_publish(call_event)
                 elif isinstance(event, TurnEndEvent) and event.text.strip():
-                    await self._send_turn(event.text)
+                    # Voice Agent already heard this exact turn as PCM. Sending
+                    # the finalized STT text too makes it answer the caller
+                    # twice and can trigger a premature tool decision.
+                    if not self.uses_live_agent_audio:
+                        await self._send_turn(event.text)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -164,7 +177,7 @@ class FrontDoorSession:
             return
         await self.stream.send_audio(pcm)
         on_audio = getattr(self.backend, "on_audio", None)
-        if on_audio is not None:
+        if self.uses_live_agent_audio and on_audio is not None:
             await on_audio(pcm)
 
     async def tool_result(self, call_id: str, result: dict[str, Any]) -> None:

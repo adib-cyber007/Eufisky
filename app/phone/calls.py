@@ -412,7 +412,9 @@ class CallController:
         })
 
     async def _guardian_text(self, call: CallSession, text: str) -> None:
-        if call.guardian is not None:
+        # Guardian receives microphone turns as either live PCM or finalized
+        # STT text, never both. Typed browser text still goes through text().
+        if call.guardian is not None and not call.guardian.uses_live_agent_audio:
             await call.guardian.on_text(text)
 
     def _save_contact(self, call: CallSession, label: str, status: str) -> None:

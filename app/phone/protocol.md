@@ -21,6 +21,14 @@ browser page. `agent_say` uses browser speech only when `playback` is `speech`;
 binary PCM is the returned Voice Agent audio path. `agent_output_reset` cancels
 both paths before an agent handoff or deterministic closing line.
 
+For microphone calls, conversational agent input also has exactly one path. In
+`voice_agent` mode, live PCM is sent to the Voice Agent while the separate STT
+stream is used only for speaker-labeled transcript and deterministic risk
+scoring. Its finalized `TurnEndEvent` must not be sent back to that same agent
+as text. In LLM/fallback mode there is no live agent-audio input, so the STT
+turn text supplies the conversational input instead. Typed browser input always
+uses the text path.
+
 ## Trusted call
 
 1. Caller sends `hello` with a trusted number, then `dial`.

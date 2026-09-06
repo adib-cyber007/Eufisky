@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from app import db
+from app.agent.frontdoor import FrontDoorSession
 from app.phone import calls as call_module
 from app.phone.calls import CallController, CallState
 from app.rooms import RoomRegistry
+from app.rules.loader import load_lexicon
+from app.stt.assemblyai_stream import TurnEndEvent
 
 
 class FakeSocket:
@@ -31,9 +35,10 @@ class FakeSTT:
         self.speaker = speaker
         self.queue: asyncio.Queue[Any] = asyncio.Queue()
         self.closed = False
+        self.audio: list[bytes] = []
 
     async def start(self) -> None: pass
-    async def send_audio(self, pcm: bytes) -> None: pass
+    async def send_audio(self, pcm: bytes) -> None: self.audio.append(pcm)
     async def close(self) -> None:
         if not self.closed:
             self.closed = True
@@ -67,6 +72,27 @@ class ScriptedBackend:
             yield await self.queue.get()
 
 
+class LiveAudioBackend:
+    provider = "voice_agent"
+
+    def __init__(self) -> None:
+        self.queue: asyncio.Queue[Any] = asyncio.Queue()
+        self.audio: list[bytes] = []
+        self.text: list[str] = []
+
+    async def start(self, instructions, tools, context) -> None:
+        await self.queue.put({"type": "caption", "text": "Hello"})
+
+    async def on_audio(self, pcm: bytes) -> None: self.audio.append(pcm)
+    async def on_user_text(self, text: str) -> None: self.text.append(text)
+    async def tool_result(self, call_id, result) -> None: pass
+    async def close(self) -> None: pass
+
+    async def events(self):
+        while True:
+            yield await self.queue.get()
+
+
 @pytest.fixture()
 def setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "frontdoor.db")
@@ -88,6 +114,39 @@ def setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         )
         return controller, sockets
     return build
+
+
+@pytest.mark.asyncio
+async def test_microphone_turn_reaches_live_voice_agent_once_not_as_duplicate_text() -> None:
+    registry = RoomRegistry()
+    room = registry.get("voice-once")
+    room.phones["caller"] = SimpleNamespace(socket=FakeSocket())
+    call = SimpleNamespace(id="voice-once", room=room, elapsed_ms=100)
+    backend = LiveAudioBackend()
+    streams: list[FakeSTT] = []
+
+    def stt_factory(speaker, keyterms, sample_rate):
+        stream = FakeSTT(speaker, keyterms, sample_rate)
+        streams.append(stream)
+        return stream
+
+    async def on_tool(_event, _score): pass
+
+    session = FrontDoorSession(
+        call, load_lexicon(), backend, on_tool, stt_factory=stt_factory,
+    )
+    await session.start()
+    await session.feed_audio(b"caller-pcm")
+    await streams[0].queue.put(TurnEndEvent("caller", 100, "My name is Pat"))
+    await asyncio.sleep(0.01)
+
+    assert streams[0].audio == [b"caller-pcm"]
+    assert backend.audio == [b"caller-pcm"]
+    assert backend.text == []
+
+    await session._send_turn("Typed instead")
+    assert backend.text == ["Typed instead"]
+    await session.close()
 
 
 @pytest.mark.asyncio

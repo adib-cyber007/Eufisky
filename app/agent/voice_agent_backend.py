@@ -18,6 +18,8 @@ from app.config import settings
 URL = "wss://agents.assemblyai.com/v1/ws"
 START_TIMEOUT = 3.0
 WATCHDOG_DELAY = 5.0
+TURN_MIN_SILENCE_MS = 1200
+TURN_MAX_SILENCE_MS = 2500
 _END = object()
 
 
@@ -91,7 +93,12 @@ class VoiceAgentBackend:
                     "input": {
                         "format": {"encoding": "audio/pcm"},
                         "keyterms": context.get("keyterms", []),
-                        "turn_detection": {"min_silence": 500, "max_silence": 1500},
+                        # Give older callers room for a natural pause without
+                        # treating it as permission to talk over them.
+                        "turn_detection": {
+                            "min_silence": TURN_MIN_SILENCE_MS,
+                            "max_silence": TURN_MAX_SILENCE_MS,
+                        },
                     },
                     "output": {"voice": "alba", "format": {"encoding": "audio/pcm"}},
                     "tools": voice_tools,

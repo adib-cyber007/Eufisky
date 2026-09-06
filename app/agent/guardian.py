@@ -24,6 +24,14 @@ class GuardianSession:
         extra = f" I recommend bringing {self.context['family_name']} in." if self.context["recommendation"] == "bring in family" else ""
         return f"I paused the call because this person {self.context['trigger_plain']}.{extra} Would you like me to end the call, or bring {self.context['family_name']} on the line?"
 
+    @property
+    def uses_live_agent_audio(self) -> bool:
+        return (
+            not self.fallback
+            and getattr(self.backend, "provider", "") == "voice_agent"
+            and callable(getattr(self.backend, "on_audio", None))
+        )
+
     async def start(self) -> None:
         try:
             if os.getenv("SIMULATE_AGENT_FAIL", "").strip() == "1":
@@ -93,7 +101,7 @@ class GuardianSession:
 
     async def on_audio(self, pcm: bytes) -> None:
         method = getattr(self.backend, "on_audio", None)
-        if not self.closed and not self.fallback and method is not None:
+        if not self.closed and self.uses_live_agent_audio and method is not None:
             await method(pcm)
 
     async def tool_result(self, call_id: str, result: dict[str, Any]) -> None:

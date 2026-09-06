@@ -4,6 +4,7 @@ import asyncio
 import json
 from pathlib import Path
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -345,3 +346,23 @@ def test_protocol_envelopes_are_normalized() -> None:
         "type": "text", "text": "hello"
     }
     assert normalize_message('{"mic":{"on":true}}') == {"type": "mic", "on": True}
+
+
+@pytest.mark.asyncio
+async def test_guardian_stt_text_is_not_duplicated_when_live_pcm_is_active(call_setup) -> None:
+    controller, _ = call_setup
+    received: list[str] = []
+
+    class Guardian:
+        uses_live_agent_audio = True
+
+        async def on_text(self, text: str) -> None:
+            received.append(text)
+
+    call = SimpleNamespace(guardian=Guardian())
+    await controller._guardian_text(call, "spoken turn")
+    assert received == []
+
+    call.guardian.uses_live_agent_audio = False
+    await controller._guardian_text(call, "fallback turn")
+    assert received == ["fallback turn"]

@@ -1,5 +1,25 @@
 # STATE SNAPSHOT
 
+Follow-up microphone interruption fix completed on 2026-09-07. Deployed call
+`5dd30e3b70e24de291db077840b28076` proved Front Door requested and executed
+`connect_caller` at 24.2 seconds; the server never chose `take_message` or
+`decline`, and the caller hung up at 32.1 seconds. The audible promise that a
+message would be passed was therefore unsanctioned conversational agent output,
+not a hidden routing decision.
+
+The confirmed code cause affected both agents: each microphone frame was sent
+to the live AssemblyAI Voice Agent, while the same audio was independently
+transcribed and its finalized text was sent into that Voice Agent a second time.
+One human utterance could therefore produce two competing agent turns, premature
+speech, or an early tool-like response. Front Door and Guardian now use live PCM
+as their sole conversational input in `voice_agent` mode; the parallel STT
+stream remains transcript/risk-only. LLM/fallback mode still uses finalized STT
+text, and typed browser input still uses text. Voice turn detection now waits
+through a natural pause (`1200` ms minimum, `2500` ms maximum silence) instead
+of responding after only `500`/`1500` ms. Protocol documentation records this
+single-input invariant. Focused audio tests passed and the full suite now passes
+all 77 tests.
+
 Audio/room reliability patch completed on 2026-09-07. The owner's manual frontend restyle was preserved. Before patching, the pre-existing untracked `STATE_after_phase0.txt` was committed unchanged as `a683d5e` (`wip: pre-patch snapshot`), and safety branch `backup-pre-audio-patch-2026-09-07` was created at exactly that commit. The earlier `backup-restyle-2026-09-07` branch also remains.
 
 Root causes and diagnosis:
@@ -20,7 +40,7 @@ What changed:
 
 Changed files: `README.md`; `app/agent/frontdoor.py`; `app/agent/guardian.py`; `app/agent/voice_agent_backend.py`; `app/phone/calls.py`; `app/phone/protocol.md`; `app/phone/ws.py`; `app/session/state_machine.py`; `app/web/caller.html`; `app/web/senior.html`; `app/web/family.html`; `app/web/dashboard.html`; `app/web/static/css/app.css`; `app/web/static/js/audio.js`; `app/web/static/js/phone.js`; `app/web/static/js/dashboard.js`; `docs/DEMO_SCRIPT.md`; `tools/smoke_public.py`; `tests/test_calls.py`; `tests/test_deployment.py`; `tests/test_replay.py`; `tests/test_smoke.py`; `tests/test_state_machine.py`; `tests/test_voice_agent_backend.py`; and `STATE.md`.
 
-Verification: `node --check` passed for all three changed JavaScript files. `.\.venv\Scripts\python.exe -m pytest -q` passed all 74 tests. After Render deployed the patch, `.\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com` passed health/database, all five pages, the production Dashboard WebSocket room acknowledgement, Replay risk/transcript/state/tool events, and replay completion. New coverage asserts the single-agent invariant, decision-only Voice Agent watchdog, output cancellation/teardown ordering, dynamic ws/wss construction, room registration acknowledgements, visible caller errors, and a fully persisted unknown-call flow with call events.
+Verification: `node --check` passed for all three changed JavaScript files. `.\.venv\Scripts\python.exe -m pytest -q` passes all 77 tests. After the prior Render deployment, `.\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com` passed health/database, all five pages, the production Dashboard WebSocket room acknowledgement, Replay risk/transcript/state/tool events, and replay completion. New microphone-path coverage asserts Front Door PCM reaches the live Voice Agent exactly once without duplicate finalized text, Guardian STT text is suppressed while live PCM is active, fallback/typed text still works, and the caller gets at least one second of silence before the agent may take the turn.
 
 Environment variables are unchanged. Local `.env`: `ASSEMBLYAI_API_KEY`, optional `GROQ_API_KEY`, optional `GEMINI_API_KEY`, `AGENT_BACKEND`, `SENIOR_NAME`, and `FAMILY_NAME`. Render additionally supplies `PORT` and `RENDER`. Deployed health reports the AssemblyAI key present and `AGENT_BACKEND=voice_agent`; no missing/expired environment variable was identified.
 
@@ -43,8 +63,9 @@ Deployed URLs: `https://eufisky.onrender.com/caller?room=test1`, `https://eufisk
 5. Answer on the Senior tab. On the phone say: “This is Michael from Medicare. Your benefits will be suspended today unless you verify your account. Please read me the number on your Medicare card.” Success means Dashboard changes in real time, risk rises, and Guardian places Caller on hold.
 6. While Guardian speaks privately to Margaret, listen on both devices. Success means there is never more than one agent voice at once; the phone hears hold music, not Guardian, and Senior hears one Guardian voice.
 7. Click **Bring in Sarah** or **End the call**. Then open Dashboard -> **History**. Success means the new completed call appears.
-8. Reply with `two-device test worked` or name the single screen/step that failed.
+8. During both Front Door and Guardian, speak a complete sentence with a short natural pause in the middle. Success means the agent waits for you to finish and only one agent voice answers.
+9. Reply with `two-device test worked` or name the single screen/step that failed.
 
 # BLOCKERS
 
-The automated code, WebSocket, persistence, and rendered-browser checks are complete. The only remaining check is inherently physical: the owner must confirm on the deployed phone/laptop speakers that no two voices are audible during Front Door closure or Guardian handoff. Recommendation: perform the eight steps above after Render finishes deploying the pushed commit.
+The automated code, WebSocket, persistence, and rendered-browser checks are complete. The only remaining check is inherently physical: the owner must confirm on the deployed phone/laptop microphone and speakers that Front Door and Guardian wait through natural pauses and that no second voice is audible. Recommendation: perform the nine steps above after Render finishes deploying the pushed commit.
