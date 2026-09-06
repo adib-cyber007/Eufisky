@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
+from app import db
 from app.phone.calls import CallState, calls
 from app.rooms import rooms
 
@@ -54,6 +55,7 @@ async def phone_socket(websocket: WebSocket) -> None:
         hello = await _receive_hello(websocket)
         room_name = str(hello.get("room") or "demo").strip()
         role = str(hello["role"])
+        db.ensure_room(room_name)
         connection = rooms.register_phone(room_name, role, websocket, hello.get("caller_phone"))
         live = rooms.get(room_name)
         current = live.current_call
@@ -83,7 +85,11 @@ async def phone_socket(websocket: WebSocket) -> None:
             raw = message.get("text")
             if raw is None:
                 continue
-            payload = normalize_message(raw)
+            try:
+                payload = normalize_message(raw)
+            except (ValueError, json.JSONDecodeError) as exc:
+                await websocket.send_json({"type": "error", "message": str(exc)})
+                continue
             message_type = payload["type"]
             if message_type == "hello":
                 connection.caller_phone = payload.get("caller_phone", connection.caller_phone)
@@ -96,7 +102,6 @@ async def phone_socket(websocket: WebSocket) -> None:
             elif message_type == "text":
                 await calls.text(room_name, role, str(payload.get("text", "")))
             elif message_type == "dtmf" and live.current_call:
-                from app import db
                 db.add_event(live.current_call.id, live.current_call.elapsed_ms, "dtmf",
                              {"role": role, "digit": str(payload.get("digit", ""))[:1]})
                 digit = str(payload.get("digit", ""))[:1]
@@ -106,6 +111,10 @@ async def phone_socket(websocket: WebSocket) -> None:
                 await calls.guardian_action(room_name, role, str(payload.get("action") or ""))
             elif message_type in {"mic", "pong", "ping"}:
                 continue
+            else:
+                await websocket.send_json(
+                    {"type": "error", "message": "Unsupported phone message"}
+                )
     except (WebSocketDisconnect, RuntimeError):
         pass
     except (ValueError, json.JSONDecodeError) as exc:
@@ -114,7 +123,7 @@ async def phone_socket(websocket: WebSocket) -> None:
     finally:
         if heartbeat:
             heartbeat.cancel()
-            with suppress(asyncio.CancelledError):
+            with suppress(asyncio.CancelledError, Exception):
                 await heartbeat
         if room_name and role and rooms.unregister_phone(room_name, role, websocket):
             live = rooms.get(room_name)
@@ -122,27 +131,37 @@ async def phone_socket(websocket: WebSocket) -> None:
             if current and current.state != CallState.ENDED:
                 participating = role in {"caller", "senior"} or (role == "family" and current.family_joined)
                 if participating:
-                    await calls.hangup(room_name, f"{role} disconnected")
+                    with suppress(Exception):
+                        await calls.hangup(room_name, f"{role} disconnected")
 
 
 async def dashboard_socket(websocket: WebSocket, room_name: str) -> None:
     await websocket.accept()
+    db.ensure_room(room_name)
     rooms.register_dashboard(room_name, websocket)
     heartbeat = asyncio.create_task(_heartbeat(websocket))
     try:
         await websocket.send_json(rooms.snapshot(room_name))
         while True:
             raw = await websocket.receive_text()
-            payload = normalize_message(raw)
+            try:
+                payload = normalize_message(raw)
+            except (ValueError, json.JSONDecodeError) as exc:
+                await websocket.send_json({"type": "error", "message": str(exc)})
+                continue
             message_type = payload["type"]
             if message_type in {"ring_family", "conference_family"}:
                 await calls.ring_family(room_name)
             elif message_type in {"pong", "ping"}:
                 continue
-    except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
+            else:
+                await websocket.send_json(
+                    {"type": "error", "message": "Unsupported dashboard message"}
+                )
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         heartbeat.cancel()
-        with suppress(asyncio.CancelledError):
+        with suppress(asyncio.CancelledError, Exception):
             await heartbeat
         rooms.unregister_dashboard(room_name, websocket)

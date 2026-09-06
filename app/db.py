@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import uuid
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
@@ -52,9 +53,11 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
 );
 CREATE TABLE IF NOT EXISTS incidents (
     id INTEGER PRIMARY KEY AUTOINCREMENT, call_id TEXT NOT NULL, summary_json TEXT,
-    redacted_transcript TEXT, entities_json TEXT, created_at TEXT NOT NULL,
+    redacted_transcript TEXT, entities_json TEXT, redacted_audio TEXT,
+    analysis_source TEXT NOT NULL DEFAULT 'template', created_at TEXT NOT NULL,
     FOREIGN KEY(call_id) REFERENCES calls(id)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_call ON incidents(call_id);
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL, call_id TEXT,
     from_phone TEXT, caller_name TEXT, body TEXT NOT NULL, callback_number TEXT,
@@ -79,18 +82,158 @@ def init_db() -> None:
     """Create every documented table and seed the demo room."""
     with _connect() as connection:
         connection.executescript(SCHEMA)
+        _ensure_column(connection, "incidents", "redacted_audio", "TEXT")
+        _ensure_column(
+            connection,
+            "incidents",
+            "analysis_source",
+            "TEXT NOT NULL DEFAULT 'template'",
+        )
     ensure_room("demo")
+    # Phase seed additions also appear for an existing local demo database.
+    with _connect() as connection:
+        _seed_room(connection, "demo", contacts=False)
 
 
-def _seed_contacts() -> list[dict[str, str]]:
+def _ensure_column(
+    connection: sqlite3.Connection, table: str, column: str, definition: str
+) -> None:
+    columns = {
+        str(row["name"])
+        for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def _seed_data() -> dict[str, Any]:
     if not SEED_PATH.exists():
-        return []
+        return {}
     data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
-    return list(data.get("contacts", []))
+    return data if isinstance(data, dict) else {}
+
+
+def _seed_call_id(room: str, key: str) -> str:
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"eufisky:{room}:{key}").hex
+
+
+def _seed_room(
+    connection: sqlite3.Connection, room: str, *, contacts: bool = True
+) -> None:
+    data = _seed_data()
+    if contacts:
+        for contact in data.get("contacts", []):
+            present = connection.execute(
+                "SELECT 1 FROM contacts WHERE room = ? AND phone = ? LIMIT 1",
+                (room, contact["phone"]),
+            ).fetchone()
+            if present:
+                continue
+            connection.execute(
+                """INSERT INTO contacts(room, phone, label, status, source, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    room,
+                    contact["phone"],
+                    contact["label"],
+                    contact.get("status", "pending"),
+                    contact.get("source", "seed"),
+                    _now(),
+                ),
+            )
+
+    for item in data.get("incidents", []):
+        key = str(item.get("key") or "incident")
+        call_id = _seed_call_id(room, key)
+        call = item.get("call") or {}
+        cursor = connection.execute(
+            """INSERT OR IGNORE INTO calls(
+                   id, room, from_phone, from_label, classification, started_at,
+                   ended_at, final_state, peak_risk, front_door_outcome,
+                   guardian_outcome, recording_caller, recording_senior
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)""",
+            (
+                call_id,
+                room,
+                call.get("from_phone"),
+                call.get("from_label"),
+                call.get("classification", "unknown"),
+                call.get("started_at") or _now(),
+                call.get("ended_at") or call.get("started_at") or _now(),
+                call.get("final_state", "WRAPUP"),
+                int(call.get("peak_risk") or 0),
+                call.get("front_door_outcome"),
+                call.get("guardian_outcome"),
+            ),
+        )
+        is_new = cursor.rowcount > 0
+        connection.execute(
+            """INSERT OR IGNORE INTO incidents(
+                   call_id, summary_json, redacted_transcript, entities_json,
+                   redacted_audio, analysis_source, created_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                call_id,
+                json.dumps(item.get("summary") or {}),
+                str(item.get("redacted_transcript") or ""),
+                json.dumps(item.get("analytics") or {}),
+                item.get("redacted_audio"),
+                str(item.get("analysis_source") or "lemur"),
+                str(item.get("created_at") or call.get("ended_at") or _now()),
+            ),
+        )
+        if not is_new:
+            continue
+        for sample in item.get("risk_samples", []):
+            connection.execute(
+                """INSERT INTO risk_samples(call_id,t_ms,score,signals_json)
+                   VALUES (?,?,?,?)""",
+                (
+                    call_id,
+                    int(sample.get("t_ms") or 0),
+                    int(sample.get("score") or 0),
+                    json.dumps(sample.get("signals") or []),
+                ),
+            )
+        for event in item.get("events", []):
+            payload = {key: value for key, value in event.items() if key != "t_ms"}
+            connection.execute(
+                """INSERT INTO call_events(call_id,t_ms,type,payload_json)
+                   VALUES (?,?,?,?)""",
+                (
+                    call_id,
+                    int(event.get("t_ms") or 0),
+                    str(event.get("type") or "state"),
+                    json.dumps(payload),
+                ),
+            )
+
+    for message in data.get("messages", []):
+        present = connection.execute(
+            """SELECT 1 FROM messages
+               WHERE room = ? AND caller_name = ? AND body = ? LIMIT 1""",
+            (room, message.get("caller_name"), message.get("body", "")),
+        ).fetchone()
+        if present:
+            continue
+        connection.execute(
+            """INSERT INTO messages(
+                   room,call_id,from_phone,caller_name,body,callback_number,created_at
+               ) VALUES (?,?,?,?,?,?,?)""",
+            (
+                room,
+                None,
+                message.get("from_phone"),
+                message.get("caller_name"),
+                message.get("body", ""),
+                message.get("callback_number"),
+                message.get("created_at") or _now(),
+            ),
+        )
 
 
 def ensure_room(room: str) -> str:
-    """Copy seed contacts into a room the first time it is seen."""
+    """Copy all demo seed data into a room the first time it is seen."""
     room = room.strip() or "demo"
     with _connect() as connection:
         known = connection.execute("SELECT 1 FROM rooms WHERE id = ?", (room,)).fetchone()
@@ -108,13 +251,7 @@ def ensure_room(room: str) -> str:
             )
             if has_existing_data:
                 return room
-            for contact in _seed_contacts():
-                connection.execute(
-                    """INSERT INTO contacts(room, phone, label, status, source, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (room, contact["phone"], contact["label"],
-                     contact.get("status", "pending"), contact.get("source", "seed"), _now()),
-                )
+            _seed_room(connection, room)
     return room
 
 
@@ -229,7 +366,10 @@ def list_calls(room: str) -> list[dict[str, Any]]:
         rows = connection.execute(
             "SELECT * FROM calls WHERE room = ? ORDER BY started_at DESC", (room,)
         ).fetchall()
-    return [dict(row) for row in rows]
+    calls = [dict(row) for row in rows]
+    for call in calls:
+        call["incident"] = get_incident(str(call["id"]))
+    return calls
 
 
 def get_call(call_id: str, room: str | None = None) -> dict[str, Any] | None:
@@ -308,7 +448,77 @@ def list_events(call_id: str) -> list[dict[str, Any]]:
         rows = connection.execute(
             "SELECT * FROM call_events WHERE call_id = ? ORDER BY t_ms, id", (call_id,)
         ).fetchall()
-    return [dict(row) for row in rows]
+    events: list[dict[str, Any]] = []
+    for row in rows:
+        event = dict(row)
+        try:
+            event["payload"] = json.loads(event.get("payload_json") or "{}")
+        except json.JSONDecodeError:
+            event["payload"] = {}
+        events.append(event)
+    return events
+
+
+def add_incident(
+    call_id: str,
+    summary: dict[str, Any],
+    redacted_transcript: str,
+    analytics: dict[str, Any] | None = None,
+    redacted_audio: str | None = None,
+    analysis_source: str = "template",
+) -> dict[str, Any]:
+    with _connect() as connection:
+        connection.execute(
+            """INSERT INTO incidents(
+                   call_id,summary_json,redacted_transcript,entities_json,
+                   redacted_audio,analysis_source,created_at
+               ) VALUES (?,?,?,?,?,?,?)
+               ON CONFLICT(call_id) DO UPDATE SET
+                   summary_json=excluded.summary_json,
+                   redacted_transcript=excluded.redacted_transcript,
+                   entities_json=excluded.entities_json,
+                   redacted_audio=excluded.redacted_audio,
+                   analysis_source=excluded.analysis_source,
+                   created_at=excluded.created_at""",
+            (
+                call_id,
+                json.dumps(summary),
+                redacted_transcript,
+                json.dumps(analytics or {}),
+                redacted_audio,
+                analysis_source,
+                _now(),
+            ),
+        )
+    return get_incident(call_id) or {}
+
+
+def get_incident(call_id: str) -> dict[str, Any] | None:
+    with _connect() as connection:
+        row = connection.execute(
+            "SELECT * FROM incidents WHERE call_id = ? ORDER BY id DESC LIMIT 1",
+            (call_id,),
+        ).fetchone()
+    if not row:
+        return None
+    incident = dict(row)
+    for source, target, fallback in (
+        ("summary_json", "summary", {}),
+        ("entities_json", "analytics", {}),
+    ):
+        try:
+            incident[target] = json.loads(incident.get(source) or "{}")
+        except json.JSONDecodeError:
+            incident[target] = fallback
+    return incident
+
+
+def db_health() -> bool:
+    try:
+        with _connect() as connection:
+            return connection.execute("SELECT 1").fetchone()[0] == 1
+    except sqlite3.Error:
+        return False
 
 
 def list_messages(room: str) -> list[dict[str, Any]]:
@@ -339,4 +549,5 @@ def call_detail(room: str, call_id: str) -> dict[str, Any] | None:
     call["events"] = list_events(call_id)
     call["samples"] = list_risk_samples(call_id)
     call["segments"] = list_segments(call_id)
+    call["incident"] = get_incident(call_id)
     return call

@@ -64,7 +64,7 @@ async def verify(base_url: str, scenario: str) -> None:
         await receive_json(caller, lambda item: item.get("type") == "state" and item.get("call_state") == "BRIDGED")
 
         await send(caller, "text", text="This is your bank's fraud department. Your debit card may be at risk.")
-        await send(caller, "text", text="To verify your account, read me your credit card number and CVV.")
+        await send(caller, "text", text="Use reference 4123 5678, then read me your credit card number and CVV.")
         hold_started = time.perf_counter()
         hold = await receive_json(caller, lambda item: item.get("type") == "hold" and item.get("on") is True, 5)
         hold_latency = time.perf_counter() - hold_started

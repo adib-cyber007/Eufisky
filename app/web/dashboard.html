@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Family dashboard — Eufisky</title><link rel="stylesheet" href="/static/css/app.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Family dashboard — Eufisky</title><link rel="stylesheet" href="/static/css/app.css?v=5"></head>
 <body class="dashboard-page">
   <main class="dashboard-shell">
-    <header class="dashboard-header"><div><a class="back-link" href="/">Eufisky</a><h1>Family dashboard</h1><p>Margaret’s protected line · room <b data-room>demo</b></p></div><span id="connection" class="connection">Connecting…</span></header>
+    <header class="dashboard-header"><div><a class="back-link" href="/">Eufisky</a><h1>Family dashboard</h1><p>Margaret’s protected line · room <b data-room>demo</b></p></div><div class="header-actions"><span id="connection" class="connection">Connecting…</span><div class="replay-control"><select id="replay-speed" aria-label="Replay speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select><button id="replay-demo" class="button replay" type="button">▶ Replay demo call</button></div><small id="replay-status" aria-live="polite"></small></div></header>
     <nav class="tabs" aria-label="Dashboard sections"><button class="active" data-tab="live">Live</button><button data-tab="contacts">Contacts</button><button data-tab="messages">Messages</button><button data-tab="history">History</button></nav>
     <section id="panel-live" class="tab-panel active">
       <div class="monitor-grid">
@@ -23,12 +23,12 @@
         </section>
       </div>
       <section id="guardian-banner" class="guardian-banner" hidden><div><strong>Guardian is with Margaret</strong><span id="guardian-detail">The caller is safely on hold.</span></div><button id="guardian-join" class="button call" type="button">Join call</button></section>
-      <div class="timeline-heading"><h2>Safety timeline</h2><button id="ring-family" class="button secondary" type="button">Ring Sarah’s phone</button></div>
+      <div class="timeline-heading"><h2>Safety timeline</h2><span>Every safety action is recorded here.</span></div>
       <ol id="timeline-list" class="timeline-list"><li class="empty">Call states and safety levels will appear here.</li></ol>
     </section>
     <section id="panel-contacts" class="tab-panel"><div class="section-heading"><div><h2>Contacts</h2><p>Trusted people always ring through without monitoring.</p></div></div><form id="contact-form" class="contact-form"><input id="contact-label" required placeholder="Name or business"><input id="contact-phone" required type="tel" placeholder="Phone number"><select id="contact-status"><option value="trusted">Trusted</option><option value="blocked">Blocked</option><option value="pending">Pending</option></select><button class="button call" type="submit">Add contact</button></form><div id="contact-list" class="data-list"></div></section>
     <section id="panel-messages" class="tab-panel"><div class="section-heading"><div><h2>Messages</h2><p>Messages taken by the Front Door agent.</p></div><button id="refresh-messages" class="button secondary" type="button">Refresh</button></div><div id="message-list" class="data-list"></div></section>
-    <section id="panel-history" class="tab-panel"><div class="section-heading"><div><h2>Call history</h2><p>Trusted calls show routing only. Their words and audio are never saved.</p></div><button id="refresh-history" class="button secondary" type="button">Refresh</button></div><div id="history-list" class="data-list"></div></section>
+    <section id="panel-history" class="tab-panel"><div class="section-heading"><div><h2>Incident history</h2><p>Unknown calls become redacted reports. Trusted calls show routing only—their words and audio are never saved.</p></div><button id="refresh-history" class="button secondary" type="button">Refresh</button></div><div id="history-list" class="incident-list"></div></section>
   </main>
-  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/dashboard.js?v=5"></script>
 </body></html>

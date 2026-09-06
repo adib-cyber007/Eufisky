@@ -2,17 +2,41 @@
   const room = new URLSearchParams(location.search).get("room") || "demo";
   const $ = (selector) => document.querySelector(selector);
   const seenTranscript = new Set();
+  const seenTimeline = new Set();
   let lastBubble = null;
   let currentCallId = null;
+  let socket = null;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+
   document.querySelectorAll("[data-room]").forEach((node) => { node.textContent = room; });
 
-  document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelectorAll("[data-tab]").forEach((item) => item.classList.toggle("active", item === button));
-    document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${button.dataset.tab}`));
-    if (button.dataset.tab === "contacts") loadContacts();
-    if (button.dataset.tab === "messages") loadMessages();
-    if (button.dataset.tab === "history") loadHistory();
-  }));
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function showError(container, message) {
+    container.replaceChildren(element("p", "empty error-copy", message));
+  }
+
+  function activateTab(name) {
+    document.querySelectorAll("[data-tab]").forEach((item) => {
+      item.classList.toggle("active", item.dataset.tab === name);
+    });
+    document.querySelectorAll(".tab-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === `panel-${name}`);
+    });
+    if (name === "contacts") loadContacts();
+    if (name === "messages") loadMessages();
+    if (name === "history") loadHistory();
+  }
+
+  document.querySelectorAll("[data-tab]").forEach((button) => {
+    button.addEventListener("click", () => activateTab(button.dataset.tab));
+  });
 
   async function request(path, options = {}) {
     const response = await fetch(`/api/rooms/${encodeURIComponent(room)}${path}`, {
@@ -23,65 +47,241 @@
   }
 
   function contactRow(contact) {
-    const row = document.createElement("article");
-    row.className = "data-row";
-    row.innerHTML = `<div><strong></strong><span></span></div><div class="row-actions"><button data-status="trusted">Trust</button><button data-status="blocked">Block</button><button data-delete>Delete</button></div>`;
-    row.querySelector("strong").textContent = contact.label;
-    row.querySelector("span").textContent = `${contact.phone} · ${contact.status}`;
-    row.querySelectorAll("[data-status]").forEach((button) => button.addEventListener("click", async () => {
-      await request(`/contacts/${contact.id}`, { method: "PATCH", body: JSON.stringify({ status: button.dataset.status }) });
-      loadContacts();
-    }));
-    row.querySelector("[data-delete]").addEventListener("click", async () => {
-      await request(`/contacts/${contact.id}`, { method: "DELETE" }); loadContacts();
+    const row = element("article", "data-row");
+    const identity = element("div");
+    identity.append(element("strong", "", contact.label));
+    identity.append(element("span", "", `${contact.phone} · ${contact.status}`));
+    const actions = element("div", "row-actions");
+    [["Trust", "trusted"], ["Block", "blocked"]].forEach(([label, status]) => {
+      const button = element("button", "", label);
+      button.type = "button";
+      button.addEventListener("click", async () => {
+        await request(`/contacts/${contact.id}`, {
+          method: "PATCH", body: JSON.stringify({ status }),
+        });
+        loadContacts();
+      });
+      actions.append(button);
     });
+    const remove = element("button", "", "Delete");
+    remove.type = "button";
+    remove.dataset.delete = "";
+    remove.addEventListener("click", async () => {
+      await request(`/contacts/${contact.id}`, { method: "DELETE" });
+      loadContacts();
+    });
+    actions.append(remove);
+    row.append(identity, actions);
     return row;
   }
 
   async function loadContacts() {
-    const contacts = await request("/contacts");
-    const list = $("#contact-list"); list.replaceChildren();
-    contacts.forEach((contact) => list.append(contactRow(contact)));
+    const list = $("#contact-list");
+    try {
+      const contacts = await request("/contacts");
+      list.replaceChildren(...contacts.map(contactRow));
+    } catch (error) {
+      showError(list, "Contacts could not be loaded. Try Refresh.");
+    }
+  }
+
+  function riskBand(score) {
+    if (score >= 90) return "critical";
+    if (score >= 65) return "guardian";
+    if (score >= 40) return "nudge";
+    return "quiet";
+  }
+
+  function sparkline(samples) {
+    const figure = element("figure", "risk-sparkline");
+    const caption = element("figcaption", "", "Risk over time");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 300 72");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Call risk score over time");
+    const values = samples.length ? samples : [{ t_ms: 0, score: 0 }];
+    const maxTime = Math.max(1, ...values.map((sample) => Number(sample.t_ms) || 0));
+    const points = values.map((sample) => {
+      const x = 4 + ((Number(sample.t_ms) || 0) / maxTime) * 292;
+      const y = 68 - (Math.max(0, Math.min(100, Number(sample.score) || 0)) / 100) * 64;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    const guide = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    guide.setAttribute("x1", "4"); guide.setAttribute("x2", "296");
+    guide.setAttribute("y1", "26.4"); guide.setAttribute("y2", "26.4");
+    guide.setAttribute("class", "guardian-guide");
+    const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    polyline.setAttribute("points", points);
+    svg.append(guide, polyline);
+    figure.append(caption, svg);
+    return figure;
+  }
+
+  function detailRow(label, value, className = "") {
+    const wrapper = element("div", className);
+    wrapper.append(element("dt", "", label), element("dd", "", value || "Not captured"));
+    return wrapper;
+  }
+
+  function historyTimeline(events) {
+    const list = element("ol", "incident-timeline");
+    const relevant = events.filter((event) => ["state", "level", "tool", "family"].includes(event.type));
+    relevant.forEach((event) => {
+      const payload = event.payload || {};
+      const item = element("li");
+      item.append(element("time", "", `${((Number(event.t_ms) || 0) / 1000).toFixed(0)}s`));
+      let title = "Call update";
+      let copy = payload.trigger || "Recorded";
+      if (event.type === "state") title = payload.to || "Call state";
+      if (event.type === "level") {
+        title = `Safety level ${payload.level || ""}`;
+        copy = payload.level === 1 ? "Margaret received a private nudge" : (payload.trigger || "Risk threshold crossed");
+      }
+      if (event.type === "tool") {
+        title = "Guardian action";
+        copy = String(payload.name || "action recorded").replaceAll("_", " ");
+      }
+      if (event.type === "family") {
+        title = "Family support";
+        copy = String(payload.event || "invited");
+      }
+      item.append(element("b", "", title), element("span", "", copy));
+      list.append(item);
+    });
+    if (!relevant.length) list.append(element("li", "empty", "No safety actions were needed."));
+    return list;
+  }
+
+  function incidentCard(call, detail) {
+    const incident = detail.incident;
+    const summary = incident.summary || {};
+    const peak = Number(call.peak_risk) || 0;
+    const card = element("article", `incident-card ${riskBand(peak)}`);
+    const header = element("header", "incident-header");
+    const heading = element("div");
+    heading.append(
+      element("h3", "", call.from_label || call.from_phone || "Withheld number"),
+      element("time", "", new Date(call.started_at).toLocaleString()),
+    );
+    const badges = element("div", "incident-badges");
+    badges.append(element("span", `risk-badge ${riskBand(peak)}`, `Peak risk ${peak}`));
+    const fallback = String(incident.analysis_source || "").startsWith("template");
+    badges.append(element("span", `source-badge ${fallback ? "fallback" : ""}`, fallback ? "Template fallback" : "AI summary"));
+    header.append(heading, badges);
+    card.append(header, element("p", "incident-summary", summary.summary || "Incident summary unavailable."));
+
+    const facts = element("dl", "incident-facts");
+    facts.append(
+      detailRow("Caller claimed", summary.caller_claim),
+      detailRow("Asked for", Array.isArray(summary.requests_made) ? summary.requests_made.join("; ") : summary.requests_made),
+      detailRow("Margaret shared", summary.disclosed_by_senior),
+      detailRow("Intervention", summary.intervention),
+      detailRow("Outcome", summary.outcome),
+      detailRow("Recommendation", summary.recommendation, "recommendation"),
+    );
+    card.append(facts);
+
+    const trace = element("div", "incident-trace");
+    trace.append(sparkline(detail.samples || []));
+    const timelineDetails = element("details", "incident-details");
+    timelineDetails.append(element("summary", "", "Safety timeline"), historyTimeline(detail.events || []));
+    trace.append(timelineDetails);
+    card.append(trace);
+
+    const disclosure = element("div", "incident-disclosure");
+    const transcript = element("details");
+    transcript.append(element("summary", "", "View redacted transcript"));
+    transcript.append(element("pre", "", incident.redacted_transcript || "No transcript was captured."));
+    disclosure.append(transcript);
+    if (incident.redacted_audio) {
+      const audioWrap = element("div", "incident-audio");
+      audioWrap.append(element("span", "", "Redacted call audio"));
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.preload = "none";
+      audio.src = `/api/rooms/${encodeURIComponent(room)}/calls/${encodeURIComponent(call.id)}/audio`;
+      audioWrap.append(audio);
+      disclosure.append(audioWrap);
+    }
+    card.append(disclosure);
+    return card;
+  }
+
+  function compactCall(call) {
+    const row = element("article", "data-row history-row");
+    const identity = element("div");
+    identity.append(
+      element("strong", "", call.from_label || call.from_phone || "Withheld number"),
+      element("span", "", new Date(call.started_at).toLocaleString()),
+    );
+    const meta = element("div", "history-meta");
+    meta.append(element("b", "", call.classification));
+    meta.append(element("em", "", call.classification === "trusted" ? "Private—never monitored" : call.ended_at ? "Report is being prepared" : "In progress"));
+    row.append(identity, meta);
+    return row;
   }
 
   async function loadHistory() {
-    const calls = await request("/calls");
-    const list = $("#history-list"); list.replaceChildren();
-    if (!calls.length) { list.innerHTML = '<p class="empty">No calls yet. Place one from the Caller phone.</p>'; return; }
-    calls.forEach((call) => {
-      const row = document.createElement("article"); row.className = "data-row history-row";
-      const date = new Date(call.started_at).toLocaleString();
-      row.innerHTML = `<div><strong></strong><span></span></div><div class="history-meta"><b></b><em></em><small></small></div>`;
-      row.querySelector("strong").textContent = call.from_label || call.from_phone || "Withheld number";
-      row.querySelector("span").textContent = date;
-      row.querySelector("b").textContent = call.classification;
-      row.querySelector("em").textContent = call.classification === "trusted" ? "Private" : `Peak risk ${call.peak_risk || 0}`;
-      row.querySelector("small").textContent = call.ended_at ? "Ended" : "In progress";
-      list.append(row);
-    });
+    const list = $("#history-list");
+    list.replaceChildren(element("p", "empty", "Loading incident history…"));
+    try {
+      const calls = await request("/calls");
+      if (!calls.length) {
+        showError(list, "No calls yet. Place one from the Caller phone or replay the demo.");
+        return;
+      }
+      const reports = calls.filter((call) => call.incident);
+      const details = await Promise.all(reports.map((call) => request(`/calls/${encodeURIComponent(call.id)}`)));
+      list.replaceChildren();
+      if (reports.length) {
+        list.append(element("h3", "history-subhead", "Safety reports"));
+        reports.forEach((call, index) => list.append(incidentCard(call, details[index])));
+      }
+      const otherCalls = calls.filter((call) => !call.incident).slice(0, 8);
+      if (otherCalls.length) {
+        list.append(element("h3", "history-subhead compact", "Recent calls"));
+        otherCalls.forEach((call) => list.append(compactCall(call)));
+      }
+    } catch (error) {
+      showError(list, "History could not be loaded. Try Refresh.");
+    }
   }
 
   async function loadMessages() {
-    const messages = await request("/messages");
-    const list = $("#message-list"); list.replaceChildren();
-    if (!messages.length) { list.innerHTML = '<p class="empty">No messages yet.</p>'; return; }
-    messages.forEach((message) => {
-      const row = document.createElement("article"); row.className = "data-row";
-      row.innerHTML = '<div><strong></strong><span></span></div><div class="history-meta"><small></small></div>';
-      row.querySelector("strong").textContent = message.caller_name || "Unknown caller";
-      row.querySelector("span").textContent = message.body;
-      row.querySelector("small").textContent = message.callback_number ? `Callback: ${message.callback_number}` : new Date(message.created_at).toLocaleString();
-      list.append(row);
-    });
+    const list = $("#message-list");
+    try {
+      const messages = await request("/messages");
+      list.replaceChildren();
+      if (!messages.length) {
+        list.append(element("p", "empty", "No messages yet."));
+        return;
+      }
+      messages.forEach((message) => {
+        const row = element("article", "data-row message-row");
+        const content = element("div");
+        content.append(element("strong", "", message.caller_name || "Unknown caller"));
+        content.append(element("p", "", message.body));
+        const meta = element("div", "history-meta");
+        meta.append(element("small", "", message.callback_number ? `Callback: ${message.callback_number}` : "No callback number"));
+        meta.append(element("time", "", new Date(message.created_at).toLocaleString()));
+        row.append(content, meta);
+        list.append(row);
+      });
+    } catch (error) {
+      showError(list, "Messages could not be loaded. Try Refresh.");
+    }
   }
 
   function resetLive(callId) {
     currentCallId = callId;
     seenTranscript.clear();
+    seenTimeline.clear();
     lastBubble = null;
     $("#live-feed").className = "transcript-stream empty";
     $("#live-feed").textContent = "Listening for the first words…";
     $("#timeline-list").innerHTML = '<li class="empty">Call connected. Monitoring begins after Margaret answers.</li>';
+    $("#live-state").textContent = "SCREENING";
+    $("#live-classification").textContent = "Unknown caller is being screened";
     updateRisk({ score: 0, signals: [], evidence: [] });
   }
 
@@ -89,32 +289,32 @@
     const score = Math.max(0, Math.min(100, Number(message.score) || 0));
     $("#risk-score").textContent = Math.round(score);
     $("#risk-fill").style.width = `${score}%`;
-    const band = score >= 90 ? "critical" : score >= 65 ? "guardian" : score >= 40 ? "nudge" : "quiet";
+    const band = riskBand(score);
     $("#risk-fill").dataset.band = band;
     $("#risk-status").textContent = {
       quiet: "Quiet", nudge: "Senior nudged", guardian: "Guardian stepped in", critical: "Critical",
     }[band];
-
     const chips = $("#signal-chips");
     chips.replaceChildren();
     if (!(message.signals || []).length) {
-      chips.innerHTML = '<span class="signal-empty">No risk signals</span>';
+      chips.append(element("span", "signal-empty", "No risk signals"));
       return;
     }
     message.signals.forEach((signal) => {
       const evidence = (message.evidence || []).filter((item) => item.family === signal);
-      const chip = document.createElement("span");
-      chip.className = `signal-chip ${signal === "benign" ? "benign" : ""}`;
-      chip.textContent = signal.replaceAll("_", " ");
-      chip.title = evidence.length
-        ? evidence.map((item) => `${item.speaker}: “${item.phrase}”`).join("\n")
-        : "Signal remains active while its score decays.";
+      const chip = element("span", `signal-chip ${signal === "benign" ? "benign" : ""}`, signal.replaceAll("_", " "));
+      chip.title = evidence.length ? evidence.map((item) => `${item.speaker}: “${item.phrase}”`).join("\n") : "Signal remains active while its score decays.";
       chips.append(chip);
     });
   }
 
+  function speakerLabel(speaker) {
+    return { senior: "Margaret", family: "Sarah", caller: "Caller", agent: "Eufisky" }[speaker] || "Caller";
+  }
+
   function addTranscript(message) {
-    const key = `${message.call_id || ""}|${message.speaker}|${message.t_ms}|${message.text}`;
+    const speaker = message.speaker || message.role || "caller";
+    const key = `${message.call_id || ""}|${speaker}|${message.t_ms}|${message.text}`;
     if (seenTranscript.has(key)) return;
     seenTranscript.add(key);
     const feed = $("#live-feed");
@@ -123,42 +323,106 @@
       feed.classList.remove("empty");
     }
     const tMs = Number(message.t_ms) || 0;
-    if (lastBubble && lastBubble.speaker === message.speaker && tMs - lastBubble.tMs <= 3000) {
+    if (lastBubble && lastBubble.speaker === speaker && tMs - lastBubble.tMs <= 3000) {
       const text = lastBubble.node.querySelector(".transcript-text");
       text.textContent = `${text.textContent} ${message.text}`.trim();
       lastBubble.tMs = tMs;
       return;
     }
-    const line = document.createElement("article");
-    line.className = `transcript-line ${message.speaker === "senior" ? "senior" : "caller"}`;
-    line.innerHTML = '<b></b><p class="transcript-text"></p><time></time>';
-    line.querySelector("b").textContent = message.speaker === "senior" ? "Margaret" : "Caller";
-    line.querySelector(".transcript-text").textContent = message.text;
-    line.querySelector("time").textContent = `${(tMs / 1000).toFixed(1)}s`;
+    const line = element("article", `transcript-line ${speaker}`);
+    line.append(element("b", "", speakerLabel(speaker)));
+    line.append(element("p", "transcript-text", message.text));
+    line.append(element("time", "", `${(tMs / 1000).toFixed(1)}s`));
     feed.append(line);
     feed.scrollTop = feed.scrollHeight;
-    lastBubble = { speaker: message.speaker, tMs, node: line };
+    lastBubble = { speaker, tMs, node: line };
   }
 
   function addTimeline(message) {
+    const key = `${message.type}|${message.t_ms}|${message.to || message.level || message.name || ""}`;
+    if (seenTimeline.has(key)) return;
+    seenTimeline.add(key);
     const list = $("#timeline-list");
     const empty = list.querySelector(".empty");
     if (empty) empty.remove();
-    const item = document.createElement("li");
+    const item = element("li");
     const seconds = ((Number(message.t_ms) || 0) / 1000).toFixed(1);
+    item.append(element("time", "", `${seconds}s`));
     if (message.type === "level") {
       item.className = `level-${message.level}`;
-      item.innerHTML = `<time>${seconds}s</time><b>Safety level ${message.level}</b><span></span>`;
-      item.querySelector("span").textContent = message.level === 1 ? "Soft nudge sent to Margaret" : `Triggered · ${message.trigger || "risk threshold"}`;
+      item.append(element("b", "", `Safety level ${message.level}`));
+      item.append(element("span", "", message.level === 1 ? "Soft nudge sent to Margaret" : `Triggered · ${message.trigger || "risk threshold"}`));
     } else if (message.type === "tool") {
-      item.innerHTML = `<time>${seconds}s</time><b>Guardian action</b><span></span>`;
-      item.querySelector("span").textContent = String(message.name || "").replaceAll("_", " ");
+      item.append(element("b", "", "Guardian action"));
+      item.append(element("span", "", String(message.name || "").replaceAll("_", " ")));
     } else {
-      item.innerHTML = `<time>${seconds}s</time><b></b><span></span>`;
-      item.querySelector("b").textContent = message.to || "Call state";
-      item.querySelector("span").textContent = message.trigger || "State changed";
+      item.append(element("b", "", message.to || "Call state"));
+      item.append(element("span", "", message.trigger || "State changed"));
     }
     list.append(item);
+  }
+
+  function handleSocketMessage(event) {
+    let message;
+    try { message = JSON.parse(event.data); } catch (error) { return; }
+    if (message.type === "ping") {
+      if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
+    if (message.type === "replay") {
+      if (message.status === "started") {
+        resetLive("replay-demo");
+        $("#replay-status").textContent = "Replay running…";
+      } else {
+        $("#replay-status").textContent = "Replay complete.";
+        $("#replay-demo").disabled = false;
+      }
+      return;
+    }
+    if (message.type === "call" && message.event === "started") resetLive(message.call_id);
+    if (message.type === "call") {
+      if (!message.replay) loadHistory();
+      if (message.event === "ended") $("#guardian-banner").hidden = true;
+    }
+    if (message.type === "incident") {
+      $("#replay-status").textContent = "A new incident report is ready.";
+      loadHistory();
+    }
+    if (message.type === "message") loadMessages();
+    if (message.type === "state") {
+      $("#live-state").textContent = message.to || "IDLE";
+      $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
+      if (message.trigger !== "snapshot") addTimeline(message);
+    }
+    if (message.type === "transcript" || message.type === "caption") addTranscript(message);
+    if (message.type === "risk") updateRisk(message);
+    if (message.type === "level" || message.type === "tool") addTimeline(message);
+    if (message.type === "guardian") {
+      const active = ["GUARDIAN", "FAMILY_CONF"].includes(message.state);
+      $("#guardian-banner").hidden = !active;
+      $("#guardian-detail").textContent = message.tool ? `Guardian chose: ${message.tool.replaceAll("_", " ")}` : (message.recommendation === "bring in family" ? "Family support is recommended." : "The caller is safely on hold.");
+      $("#guardian-join").hidden = message.state === "FAMILY_CONF";
+    }
+  }
+
+  function connectDashboard() {
+    clearTimeout(reconnectTimer);
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    $("#connection").textContent = reconnectAttempt ? "Reconnecting…" : "Connecting…";
+    socket = new WebSocket(`${scheme}://${location.host}/ws/dashboard?room=${encodeURIComponent(room)}`);
+    socket.addEventListener("open", () => {
+      reconnectAttempt = 0;
+      $("#connection").textContent = "Live connection";
+      $("#connection").classList.add("online");
+    });
+    socket.addEventListener("message", handleSocketMessage);
+    socket.addEventListener("close", () => {
+      $("#connection").textContent = "Reconnecting…";
+      $("#connection").classList.remove("online");
+      const wait = Math.min(10000, 1000 * (2 ** reconnectAttempt));
+      reconnectAttempt = Math.min(reconnectAttempt + 1, 4);
+      reconnectTimer = setTimeout(connectDashboard, wait);
+    });
   }
 
   $("#contact-form").addEventListener("submit", async (event) => {
@@ -167,46 +431,31 @@
       label: $("#contact-label").value, phone: $("#contact-phone").value,
       status: $("#contact-status").value,
     }) });
-    event.target.reset(); loadContacts();
+    event.target.reset();
+    loadContacts();
   });
   $("#refresh-history").addEventListener("click", loadHistory);
   $("#refresh-messages").addEventListener("click", loadMessages);
-  $("#ring-family").addEventListener("click", async () => {
-    const result = await request("/calls/current/ring-family", { method: "POST" });
-    addTimeline({ type: "state", t_ms: 0, to: result.ok ? "FAMILY RINGING" : "NO ACTIVE CALL", trigger: result.ok ? "Sarah was invited" : "Answer a call first" });
-  });
   $("#guardian-join").addEventListener("click", async () => {
     await request("/calls/current/guardian/family", { method: "POST" });
   });
-
-  const scheme = location.protocol === "https:" ? "wss" : "ws";
-  const socket = new WebSocket(`${scheme}://${location.host}/ws/dashboard?room=${encodeURIComponent(room)}`);
-  socket.addEventListener("open", () => { $("#connection").textContent = "Live connection"; $("#connection").classList.add("online"); });
-  socket.addEventListener("close", () => { $("#connection").textContent = "Disconnected"; $("#connection").classList.remove("online"); });
-  socket.addEventListener("message", (event) => {
-    const message = JSON.parse(event.data);
-    if (message.type === "ping") { socket.send(JSON.stringify({ type: "pong" })); return; }
-    if (message.type === "call" && message.event === "started") resetLive(message.call_id);
-    if (message.type === "call") {
-      loadHistory();
-      if (message.event === "ended") $("#guardian-banner").hidden = true;
-    }
-    if (message.type === "message") loadMessages();
-    if (message.type === "state") {
-      $("#live-state").textContent = message.to;
-      $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
-      addTimeline(message);
-    }
-    if (message.type === "transcript") addTranscript(message);
-    if (message.type === "risk") updateRisk(message);
-    if (message.type === "level") addTimeline(message);
-    if (message.type === "tool") addTimeline(message);
-    if (message.type === "guardian") {
-      const active = ["GUARDIAN", "FAMILY_CONF"].includes(message.state);
-      $("#guardian-banner").hidden = !active;
-      $("#guardian-detail").textContent = message.tool ? `Guardian chose: ${message.tool.replaceAll("_", " ")}` : (message.recommendation === "bring in family" ? "Family support is recommended." : "The caller is safely on hold.");
-      $("#guardian-join").hidden = message.state === "FAMILY_CONF";
+  $("#replay-demo").addEventListener("click", async () => {
+    const button = $("#replay-demo");
+    button.disabled = true;
+    $("#replay-status").textContent = "Starting replay…";
+    try {
+      await request("/replay", {
+        method: "POST",
+        body: JSON.stringify({ file: "demo_call.json", speed: Number($("#replay-speed").value) }),
+      });
+    } catch (error) {
+      button.disabled = false;
+      $("#replay-status").textContent = "Replay could not start. Check the live connection.";
     }
   });
-  loadContacts(); loadMessages(); loadHistory();
+
+  connectDashboard();
+  loadContacts();
+  loadMessages();
+  loadHistory();
 })();

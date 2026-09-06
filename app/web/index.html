@@ -4,28 +4,52 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Eufisky</title>
-    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/app.css?v=5">
   </head>
   <body class="lobby">
-    <main class="lobby-shell">
-      <section class="lobby-intro">
-        <div class="mark" aria-hidden="true">E</div>
-        <h1>Margaret’s phone room</h1>
-        <p>Open each phone in its own tab. Eufisky quietly checks unfamiliar callers while trusted people ring straight through.</p>
-      </section>
-      <section class="room-panel" aria-labelledby="room-title">
-        <h2 id="room-title">Room</h2>
-        <div class="room-code"><label for="room">Room name</label><input id="room" value="demo" autocomplete="off"></div>
-        <div class="room-links">
-          <a data-page="caller" href="/caller?room=demo"><span>Caller</span><small>Place a call</small></a>
-          <a data-page="senior" href="/senior?room=demo"><span>Margaret</span><small>Answer the phone</small></a>
-          <a data-page="family" href="/family?room=demo"><span>Sarah</span><small>Join when invited</small></a>
-          <a data-page="dashboard" href="/dashboard?room=demo"><span>Dashboard</span><small>Contacts and history</small></a>
+    <main class="landing-shell">
+      <header class="landing-hero">
+        <div class="hero-copy">
+          <a class="wordmark" href="/" aria-label="Eufisky home"><span class="mark" aria-hidden="true">E</span>Eufisky</a>
+          <h1>A steady voice on Margaret’s phone line.</h1>
+          <p>Eufisky answers unfamiliar callers, watches for scam pressure, and quietly steps in before personal details leave the call. Trusted people pass through untouched.</p>
+          <a class="button call dashboard-cta" data-page="dashboard" href="/dashboard?room=demo">Open the family dashboard</a>
         </div>
-        <button id="new-room" class="button secondary" type="button">Make a new room</button>
+        <div class="line-story" aria-label="How Eufisky protects a call">
+          <div><span>Unknown caller</span><i>Screened</i></div>
+          <b aria-hidden="true">E</b>
+          <div><span>Margaret</span><i>Protected privately</i></div>
+          <div><span>Sarah</span><i>Invited when needed</i></div>
+        </div>
+      </header>
+
+      <section class="room-strip" aria-labelledby="room-title">
+        <div><h2 id="room-title">Choose a phone room</h2><p>Everyone opens the same room name.</p></div>
+        <div class="room-code"><label for="room">Room name</label><input id="room" value="demo" autocomplete="off"></div>
+        <button id="new-room" class="button secondary" type="button">Make a fresh room</button>
         <p id="room-note" class="assistive-status" aria-live="polite">The demo room is ready.</p>
       </section>
+
+      <section class="roles-section" aria-labelledby="roles-title">
+        <div class="landing-heading"><h2 id="roles-title">Open the three phone tabs</h2><p>Each person gets a simple browser phone. Open these in order on one laptop, or share the room across devices.</p></div>
+        <div class="role-sequence">
+          <a class="role-card caller-role" data-page="caller" href="/caller?room=demo"><span>1</span><div><h3>Caller</h3><p>Place a trusted or unfamiliar call.</p></div><strong>Open caller phone</strong></a>
+          <a class="role-card senior-role" data-page="senior" href="/senior?room=demo"><span>2</span><div><h3>Margaret</h3><p>Answer the protected line and hear Guardian.</p></div><strong>Open Margaret’s phone</strong></a>
+          <a class="role-card family-role" data-page="family" href="/family?room=demo"><span>3</span><div><h3>Sarah</h3><p>Join privately when Margaret asks for help.</p></div><strong>Open Sarah’s phone</strong></a>
+        </div>
+      </section>
+
+      <section class="try-demo" aria-labelledby="demo-title">
+        <div class="demo-copy"><h2 id="demo-title">Try the scam demo</h2><p>Keep the dashboard visible while the call moves through the protected line.</p><a data-page="dashboard" href="/dashboard?room=demo">Open dashboard for this room</a></div>
+        <ol>
+          <li><b>Dial unknown</b><span>On Caller, choose the unknown number and press Dial.</span></li>
+          <li><b>Introduce the claim</b><span>Type: “This is Michael from Medicare, about an urgent benefits update.”</span></li>
+          <li><b>Apply pressure</b><span>After Margaret answers, ask for her Medicare card number.</span></li>
+          <li><b>Bring in family</b><span>On Margaret’s phone, ask Guardian to get Sarah.</span></li>
+        </ol>
+        <aside><strong>Microphone note</strong><p>Your browser will ask for permission when you turn the mic on. Use type-to-talk if you don’t have a mic.</p></aside>
+      </section>
     </main>
-    <script src="/static/js/index.js" defer></script>
+    <script src="/static/js/index.js?v=5" defer></script>
   </body>
 </html>

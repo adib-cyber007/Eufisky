@@ -30,6 +30,8 @@ class LiveRoom:
             await connection.socket.send_json(payload)
             return True
         except Exception:
+            if self.phones.get(role) is connection:
+                self.phones.pop(role, None)
             return False
 
     async def send_audio(self, role: str, pcm: bytes) -> bool:
@@ -40,6 +42,8 @@ class LiveRoom:
             await connection.socket.send_bytes(pcm)
             return True
         except Exception:
+            if self.phones.get(role) is connection:
+                self.phones.pop(role, None)
             return False
 
     async def broadcast_dashboard(self, payload: dict[str, Any]) -> None:

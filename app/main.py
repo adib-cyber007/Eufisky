@@ -1,6 +1,7 @@
 """FastAPI entry point for the Eufisky browser phone simulation."""
 
 from contextlib import asynccontextmanager
+import json
 from pathlib import Path
 import secrets
 from typing import Literal
@@ -14,6 +15,7 @@ from app.config import settings
 from app import db
 from app.phone.calls import calls
 from app.phone.ws import dashboard_socket, phone_socket
+from app import replay as replay_mode
 from app.rooms import rooms
 
 APP_DIR = Path(__file__).resolve().parent
@@ -42,11 +44,22 @@ class ContactPatch(BaseModel):
     status: Literal["trusted", "blocked", "pending"] | None = None
 
 
-@app.get("/api/health")
-async def health() -> dict[str, bool]:
-    """Return a dependency-free liveness response."""
+class ReplayRequest(BaseModel):
+    file: str = "demo_call.json"
+    speed: float = 2.0
 
-    return {"ok": True}
+
+@app.get("/api/health")
+async def health() -> dict[str, bool | str]:
+    """Report startup configuration without exposing any secret values."""
+
+    db_ok = db.db_health()
+    return {
+        "ok": db_ok,
+        "assemblyai_key_present": bool(settings.assemblyai_api_key),
+        "agent_backend": settings.agent_backend,
+        "db_ok": db_ok,
+    }
 
 
 @app.get("/", response_class=FileResponse)
@@ -116,15 +129,35 @@ async def calls_get(room: str, call_id: str) -> dict:
     return result
 
 
+@app.get("/api/rooms/{room}/calls/{call_id}/audio", response_class=FileResponse)
+async def incident_audio(room: str, call_id: str) -> FileResponse:
+    result = db.call_detail(room, call_id)
+    incident = result.get("incident") if result else None
+    value = incident.get("redacted_audio") if incident else None
+    if not value:
+        raise HTTPException(status_code=404, detail="Redacted audio not available")
+    path = Path(str(value))
+    path = path if path.is_absolute() else db.PROJECT_ROOT / path
+    resolved = path.resolve()
+    if not resolved.is_relative_to(db.DATA_DIR.resolve()) or not resolved.exists():
+        raise HTTPException(status_code=404, detail="Redacted audio not available")
+    return FileResponse(resolved, media_type="audio/wav", filename=f"incident-{call_id}.wav")
+
+
 @app.get("/api/rooms/{room}/messages")
 async def messages_list(room: str) -> list[dict]:
     return db.list_messages(room)
 
 
 @app.post("/api/rooms/{room}/replay")
-async def replay(room: str) -> dict[str, str | bool]:
+async def replay(room: str, request: ReplayRequest) -> dict:
     db.ensure_room(room)
-    return {"ok": True, "status": "Replay Mode arrives in a later phase"}
+    try:
+        return replay_mode.start(room, request.file, request.speed)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Replay file not found") from None
+    except (ValueError, json.JSONDecodeError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from None
 
 
 @app.get("/api/rooms/{room}/live")

@@ -127,7 +127,7 @@ async def test_decline_ends_without_message(setup) -> None:
     await controller.text("demo", "caller", "I'm selling extended car warranties")
     await asyncio.sleep(0.02)
     assert call.state == CallState.ENDED
-    assert db.list_messages("demo") == []
+    assert all(message["call_id"] != call.id for message in db.list_messages("demo"))
 
 
 @pytest.mark.asyncio

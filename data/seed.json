@@ -12,5 +12,150 @@
       "status": "trusted",
       "source": "seed"
     }
+  ],
+  "incidents": [
+    {
+      "key": "medicare-scam-blocked",
+      "call": {
+        "from_phone": "+15550198740",
+        "from_label": "Unknown caller",
+        "classification": "unknown",
+        "started_at": "2026-09-03T15:10:00+00:00",
+        "ended_at": "2026-09-03T15:11:07+00:00",
+        "final_state": "WRAPUP",
+        "peak_risk": 96,
+        "front_door_outcome": "connect_caller",
+        "guardian_outcome": "end_call"
+      },
+      "summary": {
+        "summary": "A caller claiming to represent Medicare created urgency around Margaret's benefits and asked her to verify sensitive account details. Eufisky paused and ended the call before information was shared.",
+        "caller_claim": "Michael said he was calling from Medicare about an urgent benefits update.",
+        "requests_made": ["Verify a Medicare card number", "Confirm banking details"],
+        "disclosed_by_senior": "No sensitive details were disclosed.",
+        "intervention": "Eufisky placed the caller on hold and privately warned Margaret.",
+        "outcome": "Margaret ended the call and the number was blocked.",
+        "recommendation": "Keep the number blocked and contact Medicare through the number on an official statement if follow-up is needed."
+      },
+      "redacted_transcript": "Caller: This is Michael from Medicare. Your benefits will be suspended today unless we verify your account.\nCaller: Please read the number on your Medicare card and confirm the bank account ending in ####.\nMargaret: I am not giving you that. End the call.",
+      "analytics": {
+        "entities": [{"entity_type": "organization", "text": "Medicare"}],
+        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE"}]
+      },
+      "analysis_source": "lemur",
+      "created_at": "2026-09-03T15:11:35+00:00",
+      "risk_samples": [
+        {"t_ms": 0, "score": 12, "signals": ["authority_impersonation"]},
+        {"t_ms": 18500, "score": 46, "signals": ["authority_impersonation", "urgency"]},
+        {"t_ms": 33800, "score": 72, "signals": ["authority_impersonation", "urgency", "pii_request"]},
+        {"t_ms": 45100, "score": 96, "signals": ["authority_impersonation", "urgency", "pii_request", "banking_information"]}
+      ],
+      "events": [
+        {"type": "state", "t_ms": 0, "from": "SCREENING", "to": "BRIDGED", "trigger": "intro_complete"},
+        {"type": "level", "t_ms": 18500, "level": 1, "trigger": "score_gte_40"},
+        {"type": "level", "t_ms": 33800, "level": 2, "trigger": "score_gte_65"},
+        {"type": "state", "t_ms": 33900, "from": "BRIDGED", "to": "GUARDIAN", "trigger": "score_gte_65"},
+        {"type": "level", "t_ms": 45100, "level": 3, "trigger": "score_gte_90"},
+        {"type": "tool", "t_ms": 58900, "agent": "guardian", "name": "end_call", "args": {"block_number": true}},
+        {"type": "state", "t_ms": 60100, "from": "GUARDIAN", "to": "WRAPUP", "trigger": "end_call"}
+      ]
+    },
+    {
+      "key": "grandparent-scam-ended",
+      "call": {
+        "from_phone": "+15550134418",
+        "from_label": "Unknown caller",
+        "classification": "unknown",
+        "started_at": "2026-08-31T18:42:00+00:00",
+        "ended_at": "2026-08-31T18:42:51+00:00",
+        "final_state": "WRAPUP",
+        "peak_risk": 78,
+        "front_door_outcome": "connect_caller",
+        "guardian_outcome": "end_call"
+      },
+      "summary": {
+        "summary": "The caller pretended to be Margaret's grandson and said he needed bail money immediately. Margaret recognized the pressure after Eufisky's warning and chose to end the call.",
+        "caller_claim": "The caller claimed to be Margaret's grandson in legal trouble.",
+        "requests_made": ["Send bail money", "Keep the call secret from family"],
+        "disclosed_by_senior": "Margaret did not share financial information.",
+        "intervention": "Eufisky paused the caller and explained the family-emergency pattern privately.",
+        "outcome": "Margaret ended the call herself.",
+        "recommendation": "Call the grandson on his known number before responding to any future emergency request."
+      },
+      "redacted_transcript": "Caller: Grandma, it is me. I am in trouble and need bail money right now. Please do not tell Mom.\nMargaret: I will call my grandson directly. End this call.",
+      "analytics": {
+        "entities": [],
+        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE"}]
+      },
+      "analysis_source": "lemur",
+      "created_at": "2026-08-31T18:43:20+00:00",
+      "risk_samples": [
+        {"t_ms": 0, "score": 5, "signals": []},
+        {"t_ms": 14100, "score": 45, "signals": ["family_emergency", "urgency"]},
+        {"t_ms": 27700, "score": 78, "signals": ["family_emergency", "urgency", "secrecy", "payment_method"]}
+      ],
+      "events": [
+        {"type": "state", "t_ms": 0, "from": "SCREENING", "to": "BRIDGED", "trigger": "intro_complete"},
+        {"type": "level", "t_ms": 14100, "level": 1, "trigger": "score_gte_40"},
+        {"type": "level", "t_ms": 27700, "level": 2, "trigger": "payment_compliance"},
+        {"type": "state", "t_ms": 27800, "from": "BRIDGED", "to": "GUARDIAN", "trigger": "payment_compliance"},
+        {"type": "tool", "t_ms": 43800, "agent": "guardian", "name": "end_call", "args": {"block_number": false}},
+        {"type": "state", "t_ms": 45100, "from": "GUARDIAN", "to": "WRAPUP", "trigger": "end_call"}
+      ]
+    },
+    {
+      "key": "benign-pharmacy-call",
+      "call": {
+        "from_phone": "+15550107741",
+        "from_label": "Greenway Pharmacy",
+        "classification": "unknown",
+        "started_at": "2026-08-28T14:20:00+00:00",
+        "ended_at": "2026-08-28T14:20:38+00:00",
+        "final_state": "WRAPUP",
+        "peak_risk": 8,
+        "front_door_outcome": "connect_caller",
+        "guardian_outcome": null
+      },
+      "summary": {
+        "summary": "Greenway Pharmacy called to say Margaret's prescription was ready. The short call contained no payment request, urgency, or sensitive-information request.",
+        "caller_claim": "The caller identified the business as Greenway Pharmacy.",
+        "requests_made": ["Pick up a ready prescription"],
+        "disclosed_by_senior": "No sensitive details were disclosed.",
+        "intervention": "No intervention was needed; Eufisky monitored quietly.",
+        "outcome": "Margaret thanked the pharmacy and ended the call normally.",
+        "recommendation": "No action needed. Consider adding this verified pharmacy number to trusted contacts."
+      },
+      "redacted_transcript": "Caller: Hello Margaret, this is Greenway Pharmacy. Your prescription is ready for pickup.\nMargaret: Thank you. I will collect it this afternoon.",
+      "analytics": {
+        "entities": [{"entity_type": "organization", "text": "Greenway Pharmacy"}],
+        "sentiments": [{"speaker": "Margaret", "sentiment": "POSITIVE"}]
+      },
+      "analysis_source": "lemur",
+      "created_at": "2026-08-28T14:20:59+00:00",
+      "risk_samples": [
+        {"t_ms": 0, "score": 0, "signals": []},
+        {"t_ms": 12600, "score": 8, "signals": ["benign"]},
+        {"t_ms": 30100, "score": 0, "signals": ["benign"]}
+      ],
+      "events": [
+        {"type": "state", "t_ms": 0, "from": "SCREENING", "to": "BRIDGED", "trigger": "intro_complete"},
+        {"type": "state", "t_ms": 36600, "from": "BRIDGED", "to": "WRAPUP", "trigger": "caller hung up"}
+      ]
+    }
+  ],
+  "messages": [
+    {
+      "from_phone": "+15550106220",
+      "caller_name": "Dr. Patel's office",
+      "body": "Please call to confirm Margaret's appointment on Tuesday.",
+      "callback_number": "+15550106220",
+      "created_at": "2026-09-02T16:05:00+00:00"
+    },
+    {
+      "from_phone": "+15550104672",
+      "caller_name": "Nora",
+      "body": "The neighborhood lunch starts at noon on Saturday.",
+      "callback_number": "+15550104672",
+      "created_at": "2026-08-30T13:18:00+00:00"
+    }
   ]
 }
