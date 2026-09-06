@@ -1,0 +1,14 @@
+STATE SNAPSHOT:
+- Eufisky is runnable and pushed to GitHub.
+- Local and remote main match at commit 624559a.
+- Tests: 2 passed.
+- Health endpoint: {"ok":true}.
+- Realtime STT: PASS — 834 ms median word latency.
+- Voice Agent: PASS — selected as AGENT_BACKEND.
+- Post-call transcription, PII redaction, analytics, and incident JSON: PASS.
+- Groq: SKIPPED because its optional key is unset.
+- Full saved report: [STATE.md](C:/Users/moham/Documents/ChatGPT/Eufisky/STATE.md)
+- Run command:
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+Open http://localhost:8000 and http://localhost:8000/api/health.
+Goal execution time: approximately 43 minutes.
