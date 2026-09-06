@@ -1,4 +1,5 @@
 # Eufisky
+<img width="2109" height="746" alt="image" src="https://github.com/user-attachments/assets/2dddae12-1674-4098-9360-aa055403bc54" />
 
 Eufisky is a browser-based simulation of a voice AI agent that guards an older adult's phone line. Trusted callers remain private; unknown callers are screened, monitored by speaker-separated AssemblyAI streaming, and paused for a private Guardian intervention when deterministic scam signals rise. Afterward, personal information is redacted and the family receives a plain-English incident report.
 
