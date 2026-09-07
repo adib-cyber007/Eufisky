@@ -53,18 +53,19 @@ async def run(base_url: str) -> None:
         print("PASS health and database")
 
         pages = {
-            "/": "<title>Eufisky</title>",
+            "/": "<title>Eufisky — Voice protection for older adults</title>",
             f"/caller?room={quote(room)}": "Caller",
             f"/senior?room={quote(room)}": "Margaret",
             f"/family?room={quote(room)}": "Sarah",
             f"/dashboard?room={quote(room)}": "Dashboard",
+            "/slides": "Eufisky — Hackathon deck",
         }
         for path, marker in pages.items():
             response = await client.get(f"{base_url}{path}")
             response.raise_for_status()
             if marker not in response.text:
                 raise RuntimeError(f"{path} loaded but did not contain its expected page marker")
-        print("PASS landing, Caller, Senior, Family, and Dashboard pages")
+        print("PASS landing, Caller, Senior, Family, Dashboard, and Slides pages")
 
         parsed = urlsplit(base_url)
         ws_scheme = "wss" if parsed.scheme == "https" else "ws"

@@ -74,7 +74,7 @@ async def index() -> FileResponse:
 
 @app.get("/{page_name}", response_class=FileResponse)
 async def phone_page(page_name: str) -> FileResponse:
-    if page_name not in {"caller", "senior", "family", "dashboard"}:
+    if page_name not in {"caller", "senior", "family", "dashboard", "slides"}:
         raise HTTPException(status_code=404, detail="Page not found")
     return FileResponse(WEB_DIR / f"{page_name}.html")
 

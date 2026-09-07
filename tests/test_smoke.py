@@ -26,7 +26,7 @@ def test_index_title() -> None:
 
     response = TestClient(app).get("/")
     assert response.status_code == 200
-    assert "<title>Eufisky</title>" in response.text
+    assert "<title>Eufisky — Voice protection for older adults</title>" in response.text
 
 
 def test_dashboard_socket_survives_malformed_messages_and_seeds_room(
