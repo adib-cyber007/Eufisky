@@ -1,54 +1,61 @@
-# STATE SNAPSHOT
+# STATE SNAPSHOT (save to STATE.md, commit/push)
 
-Hackathon submission-assets phase completed on 2026-09-07.
+Default-off stretch phase completed on 2026-09-09.
 
-Eufisky remains a browser-based phone-line simulation deployed at
-https://eufisky.onrender.com. Trusted contacts bypass AI processing. Unknown
-callers pass through the Front Door agent; connected caller and senior audio
-uses separate AssemblyAI Universal Streaming sessions and a deterministic risk
-engine; the Guardian speaks privately with the senior through explicit tool
-actions. Post-call processing requests batch PII redaction and generates a
-LeMUR-style incident summary through AssemblyAI's current LLM Gateway, with a
-deterministic template fallback. The product limitations remain explicit: the
-demo is not real telephony, caller ID can be spoofed, and voice/risk support is
-English only. Twilio or carrier integration is roadmap work.
+Eufisky remains a deployed, submission-ready browser phone-line simulation at
+https://eufisky.onrender.com. The proven submission path is unchanged: trusted
+contacts bypass AI processing; unknown calls use Front Door, separate caller
+and senior AssemblyAI streams, deterministic risk scoring, private Guardian
+intervention, and redacted post-call reports.
 
-Submission assets now included:
+Added without enabling anything in the submitted demo:
 
-- `README.md`: product overview, four-point feature summary, live demo and
-  60-second try-it path, type-to-talk guidance, ASCII and PNG architecture,
-  AssemblyAI feature map, privacy, limitations, seven-command local setup,
-  tests, and MIT license.
-- `docs/ARCHITECTURE.md`: components, state machine, exact decaying-risk
-  formula, escalation ladder, and data model.
-- `docs/BUSINESS.md`: FTC-sourced problem framing, buyers, pricing hypothesis,
-  channel strategy, business value, metrics, and roadmap.
-- `app/web/slides.html`: nine-slide Reveal.js deck served at `/slides`, with
-  Reveal's bundled print rules plus Eufisky print styling for `?print-pdf`.
-- `docs/SUBMISSION.md`: copy-ready title, 135-character short description,
-  364-word long description, tags, URLs, 90-second pitch, 10 judge Q&As, and an
-  exact three-minute video script/shot list.
-- `docs/cover.png` (1920x1080), `docs/cover-1200x630.png` (1200x630), and
-  `docs/architecture.png` (1600x900), reproducible with the Pillow scripts in
-  `tools/`.
-- Consistent page titles, `app/web/static/favicon.svg`, and root `LICENSE`.
+- A privacy-safe entity and sentiment timeline for existing batch results.
+  Only organization values display; all other entity values and digit runs are
+  redacted again before reaching the browser.
+- Confidence-friendly Guardian browser speech at rate 0.82, with a preferred
+  English female system voice when available. Other agent speech stays at the
+  existing rate and voice.
+- Optional Spanish monitoring using AssemblyAI Universal-3.5 Pro Streaming's
+  documented `language_codes=["es"]` bias and a Spanish risk lexicon with the
+  exact English policy's weights, decay, caps, and combinations. Front Door and
+  Guardian continue speaking English.
+- Copy incident report and a clean printable incident page, both sourced only
+  from the existing redacted report data.
+- `docs/TELEPHONY_ROADMAP.md`, specifying a gated Twilio Media Streams and
+  Conference design with `both_tracks` monitoring and a private Guardian stream
+  to the senior leg. No Twilio dependency or runtime path was added because no
+  working trial number was confirmed.
+
+Safety controls:
+
+- `FEATURE_INCIDENT_INSIGHTS`, `FEATURE_GUARDIAN_VOICE_TUNING`,
+  `FEATURE_SPANISH_MONITORING`, `FEATURE_INCIDENT_EXPORT`, and the reserved
+  `FEATURE_TWILIO_TELEPHONY` all default OFF.
+- `.env.example` uses `0`; `render.yaml` explicitly uses `"false"` for every
+  stretch flag; the public `/api/features` endpoint confirms all five are OFF.
+- Per-item tests and one-line demo checks are recorded in
+  `docs/STRETCH_FEATURES.md`.
 
 Verification completed:
 
-- `python -m pytest -q`: 77 passed. `ruff` was not installed, so its conditional
-  check was not applicable.
-- Python compilation and HTML parsing passed.
-- Both generated cover sizes and the architecture image were opened and
-  visually inspected; all labels fit their canvases.
-- Local `/slides` and `/slides?print-pdf` returned HTTP 200. Browser inspection
-  confirmed all nine slides, working Reveal navigation, a dark title slide, and
-  a dark print-PDF preview.
-- The deployed smoke test passed health/database, Landing, Caller, Senior,
-  Family, Dashboard, Slides, secure Dashboard WebSocket registration, Replay
-  risk/transcript/state/tool events, and completion.
-- Every URL in `docs/SUBMISSION.md` returned HTTP 200 after deployment.
-- Submission-assets commit `35c0959` is pushed to `origin/main`. The final
-  closeout commit is pushed and tagged `v1.0-hackathon`.
+- Full suite: **82 passed** (up from 77), with only pre-existing dependency and
+  pytest-cache warnings.
+- All changed JavaScript files passed `node --check`; Python compilation and
+  `git diff --check` passed.
+- Local default-off browser check confirmed no timeline, export actions, or
+  Spanish control appears. The complete local smoke test passed.
+- Local opt-in browser check confirmed timeline rendering, Spanish room-setting
+  save/restore, report copying, and the printable redacted layout.
+- The post-deploy public smoke test passed health/database, Landing, Caller,
+  Senior, Family, Dashboard, Slides, secure Dashboard WebSocket, Replay, and the
+  complete event story.
+- Stretch implementation commit `391e4d8` is pushed to `origin/main`.
+- Release tag `v1.0-hackathon` remains the original submission checkpoint at
+  `564e8c6`; the default-off stretch work is intentionally subsequent.
+
+One pre-existing local edit to `app/web/slides.html` remains unstaged and was
+deliberately excluded from both stretch commits.
 
 # HUMAN ACTIONS REQUIRED NOW
 
@@ -64,7 +71,10 @@ Verification completed:
 4. Record the video by following the timestamped table and exact spoken lines
    in `docs/SUBMISSION.md`; no additional script writing is needed.
 
+No stretch-feature configuration is required for submission; keep the flags
+OFF.
+
 # BLOCKERS
 
-None. All non-video submission assets are generated, verified, deployed,
-committed, pushed, and release-tagged.
+None. Real telephony is intentionally roadmap-only until the owner confirms a
+working Twilio trial number and verified destinations.
