@@ -126,12 +126,30 @@
       this.stopPcm();
     }
 
+    preferredGuardianVoice() {
+      const preferredNames = [
+        "microsoft aria", "microsoft zira", "microsoft hazel", "samantha",
+        "victoria", "karen", "moira", "tessa", "google uk english female",
+      ];
+      const voices = window.speechSynthesis.getVoices();
+      return voices.find((voice) => {
+        const name = voice.name.toLowerCase();
+        return voice.lang.toLowerCase().startsWith("en")
+          && (name.includes("female") || preferredNames.some((candidate) => name.includes(candidate)));
+      }) || null;
+    }
+
     speak(text) {
+      const options = arguments[1] || {};
       this.stopPcm();
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.93;
+      utterance.rate = options.confidenceFriendly ? 0.82 : 0.93;
       utterance.pitch = 1;
+      if (options.confidenceFriendly) {
+        const voice = this.preferredGuardianVoice();
+        if (voice) utterance.voice = voice;
+      }
       window.speechSynthesis.speak(utterance);
     }
 

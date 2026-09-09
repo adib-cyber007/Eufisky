@@ -17,6 +17,7 @@
   let active = false;
   let micOn = false;
   let currentState = "IDLE";
+  let guardianVoiceTuning = false;
   const noticeQueue = [];
   let noticeVisible = false;
   const scheme = location.protocol === "https:" ? "wss" : "ws";
@@ -26,6 +27,10 @@
     (frame) => { if (socket.readyState === WebSocket.OPEN && micOn) socket.send(frame); },
     (level) => { $("#meter-fill").style.width = `${Math.round(level * 100)}%`; },
   );
+  fetch("/api/features")
+    .then((response) => response.ok ? response.json() : {})
+    .then((features) => { guardianVoiceTuning = Boolean(features.guardian_voice_tuning); })
+    .catch(() => {});
 
   function callerPhone() {
     if (role !== "caller") return undefined;
@@ -119,7 +124,11 @@
     }
     if (message.type === "agent_say") {
       $("#caption").textContent = message.text;
-      if (message.playback !== "audio") audio.speak(message.text);
+      if (message.playback !== "audio") {
+        audio.speak(message.text, {
+          confidenceFriendly: guardianVoiceTuning && message.agent === "guardian",
+        });
+      }
     }
     if (message.type === "agent_output_reset") audio.resetOutput();
     if (message.type === "agent_caption") $("#caption").textContent = message.text;

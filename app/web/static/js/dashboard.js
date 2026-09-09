@@ -57,6 +57,11 @@
     return response.status === 204 ? null : response.json();
   }
 
+  async function featureRequest() {
+    const response = await fetch("/api/features");
+    return response.ok ? response.json() : {};
+  }
+
   function updateUnreadBadge() {
     const badge = $("#message-unread");
     badge.textContent = String(unreadMessages);
@@ -65,8 +70,13 @@
 
   async function loadSettings() {
     try {
-      const roomSettings = await request("/settings");
+      const [roomSettings, features] = await Promise.all([
+        request("/settings"),
+        featureRequest().catch(() => ({})),
+      ]);
       $("#always-ring-first").checked = Boolean(roomSettings.always_ring_first);
+      $("#monitoring-language").value = roomSettings.language === "es" ? "es" : "en";
+      $("#spanish-monitoring-setting").hidden = !features.spanish_monitoring;
       $("#settings-feedback").textContent = "";
     } catch (error) {
       $("#settings-feedback").textContent = "Settings could not be loaded.";
@@ -225,6 +235,25 @@
     return list;
   }
 
+  function insightTimeline(items) {
+    const list = element("ol", "insight-timeline");
+    items.forEach((insight) => {
+      const item = element("li", `${insight.kind} ${insight.sentiment || ""}`.trim());
+      item.append(element("time", "", insight.t_ms ? `${(Number(insight.t_ms) / 1000).toFixed(0)}s` : "Call"));
+      const content = element("div");
+      const title = element("b", "", insight.label || "Conversation insight");
+      if (insight.speaker) title.prepend(`${insight.speaker} · `);
+      content.append(title, element("span", "", insight.text || "Detected in the call"));
+      if (insight.confidence !== null && insight.confidence !== undefined) {
+        content.append(element("small", "", `${Math.round(Number(insight.confidence) * 100)}% confidence`));
+      }
+      item.append(content);
+      list.append(item);
+    });
+    if (!items.length) list.append(element("li", "empty", "No entity or sentiment results were returned."));
+    return list;
+  }
+
   function incidentCard(call, detail) {
     const incident = detail.incident;
     const summary = incident.summary || {};
@@ -260,6 +289,15 @@
     const timelineDetails = element("details", "incident-details");
     timelineDetails.append(element("summary", "", "Safety timeline"), historyTimeline(detail.events || []));
     trace.append(timelineDetails);
+    if (Array.isArray(incident.insight_timeline)) {
+      trace.classList.add("has-insights");
+      const insightDetails = element("details", "incident-details insight-details");
+      insightDetails.append(
+        element("summary", "", "Entity + sentiment timeline"),
+        insightTimeline(incident.insight_timeline),
+      );
+      trace.append(insightDetails);
+    }
     card.append(trace);
 
     const disclosure = element("div", "incident-disclosure");
@@ -278,6 +316,30 @@
       disclosure.append(audioWrap);
     }
     card.append(disclosure);
+    if (detail.features?.incident_export) {
+      const actions = element("div", "incident-actions");
+      const copy = element("button", "button secondary", "Copy incident report");
+      copy.type = "button";
+      const print = element("a", "button secondary", "Printable report");
+      print.href = `/incident/${encodeURIComponent(room)}/${encodeURIComponent(call.id)}`;
+      print.target = "_blank";
+      print.rel = "noopener";
+      const feedback = element("span", "copy-feedback");
+      feedback.setAttribute("role", "status");
+      feedback.setAttribute("aria-live", "polite");
+      copy.addEventListener("click", async () => {
+        try {
+          await window.EufiskyIncidentReport.copy(
+            window.EufiskyIncidentReport.text(call, detail),
+          );
+          feedback.textContent = "Report copied.";
+        } catch (error) {
+          feedback.textContent = "Copy was not available. Open the printable report instead.";
+        }
+      });
+      actions.append(copy, print, feedback);
+      card.append(actions);
+    }
     return card;
   }
 
@@ -549,6 +611,28 @@
       $("#settings-feedback").textContent = "The setting could not be saved.";
     } finally {
       toggle.disabled = false;
+    }
+  });
+  $("#monitoring-language").addEventListener("change", async (event) => {
+    const select = event.target;
+    const previous = select.value === "es" ? "en" : "es";
+    select.disabled = true;
+    try {
+      const saved = await request("/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ language: select.value }),
+      });
+      select.value = saved.language;
+      $("#language-feedback").classList.remove("error-copy");
+      $("#language-feedback").textContent = select.value === "es"
+        ? "Spanish monitoring will apply to the next unknown call."
+        : "English monitoring will apply to the next unknown call.";
+    } catch (error) {
+      select.value = previous;
+      $("#language-feedback").classList.add("error-copy");
+      $("#language-feedback").textContent = "The monitoring language could not be saved.";
+    } finally {
+      select.disabled = false;
     }
   });
   $("#guardian-join").addEventListener("click", async () => {

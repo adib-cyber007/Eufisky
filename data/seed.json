@@ -38,8 +38,8 @@
       },
       "redacted_transcript": "Caller: This is Michael from Medicare. Your benefits will be suspended today unless we verify your account.\nCaller: Please read the number on your Medicare card and confirm the bank account ending in ####.\nMargaret: I am not giving you that. End the call.",
       "analytics": {
-        "entities": [{"entity_type": "organization", "text": "Medicare"}],
-        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE"}]
+        "entities": [{"entity_type": "organization", "text": "Medicare", "start": 1200, "end": 1980, "confidence": 0.98}],
+        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE", "text": "Your benefits will be suspended today.", "start": 14200, "end": 18300, "confidence": 0.94}]
       },
       "analysis_source": "lemur",
       "created_at": "2026-09-03T15:11:35+00:00",
@@ -84,7 +84,7 @@
       "redacted_transcript": "Caller: Grandma, it is me. I am in trouble and need bail money right now. Please do not tell Mom.\nMargaret: I will call my grandson directly. End this call.",
       "analytics": {
         "entities": [],
-        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE"}]
+        "sentiments": [{"speaker": "Caller", "sentiment": "NEGATIVE", "text": "I am in trouble and need bail money right now.", "start": 8800, "end": 13900, "confidence": 0.92}]
       },
       "analysis_source": "lemur",
       "created_at": "2026-08-31T18:43:20+00:00",
@@ -126,8 +126,8 @@
       },
       "redacted_transcript": "Caller: Hello Margaret, this is Greenway Pharmacy. Your prescription is ready for pickup.\nMargaret: Thank you. I will collect it this afternoon.",
       "analytics": {
-        "entities": [{"entity_type": "organization", "text": "Greenway Pharmacy"}],
-        "sentiments": [{"speaker": "Margaret", "sentiment": "POSITIVE"}]
+        "entities": [{"entity_type": "organization", "text": "Greenway Pharmacy", "start": 700, "end": 2150, "confidence": 0.97}],
+        "sentiments": [{"speaker": "Margaret", "sentiment": "POSITIVE", "text": "Thank you. I will collect it this afternoon.", "start": 18100, "end": 22300, "confidence": 0.96}]
       },
       "analysis_source": "lemur",
       "created_at": "2026-08-28T14:20:59+00:00",

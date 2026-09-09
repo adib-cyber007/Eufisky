@@ -89,7 +89,11 @@ formula, escalation ladder, and data model.
 
 - This is a simulated browser phone line, not a carrier service. Twilio/real telephony is roadmap work.
 - Caller ID can be spoofed; a production version needs carrier attestation and stronger identity signals.
-- Agent speech and the risk lexicon are English only.
+- The submitted demo remains English-only. Optional Spanish transcription and
+  risk monitoring is behind a default-off feature flag; agents still speak
+  English.
+- Stretch controls, checks, and one-line demos are listed in
+  [`docs/STRETCH_FEATURES.md`](docs/STRETCH_FEATURES.md).
 - Browser speech, microphone behavior, and free-host cold starts vary by device.
 - A deterministic score reduces model guesswork but does not guarantee that every scam is caught or every legitimate call passes.
 - Post-call summary generation uses AssemblyAI's LLM Gateway as the current LeMUR successor, with a template fallback if the provider is unavailable.

@@ -15,6 +15,16 @@ services:
         value: Margaret
       - key: FAMILY_NAME
         value: Sarah
+      - key: FEATURE_INCIDENT_INSIGHTS
+        value: "false"
+      - key: FEATURE_GUARDIAN_VOICE_TUNING
+        value: "false"
+      - key: FEATURE_SPANISH_MONITORING
+        value: "false"
+      - key: FEATURE_INCIDENT_EXPORT
+        value: "false"
+      - key: FEATURE_TWILIO_TELEPHONY
+        value: "false"
       - key: ASSEMBLYAI_API_KEY
         sync: false
       - key: GROQ_API_KEY

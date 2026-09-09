@@ -1,0 +1,201 @@
+# Spanish monitoring vocabulary. Signal weights, decay, caps, and combos are
+# intentionally identical to the proven English policy; only phrases differ.
+signals:
+  authority_impersonation:
+    speaker: caller
+    weight: 20
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - medicare
+      - seguro social
+      - su banco
+      - hacienda
+      - servicio de impuestos
+      - policía
+      - orden de arresto
+      - departamento de fraude
+      - agente federal
+      - oficina del gobierno
+      - departamento del tesoro
+  urgency:
+    speaker: caller
+    weight: 15
+    half_life_s: 60
+    cap: 3
+    phrases:
+      - ahora mismo
+      - inmediatamente
+      - solo hoy
+      - suspendido
+      - suspendida
+      - última oportunidad
+      - antes de medianoche
+      - actúe ahora
+      - urgente
+      - sin demora
+      - dentro de una hora
+      - aviso final
+      - vence hoy
+  secrecy:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - no le diga a nadie
+      - entre nosotros
+      - no cuelgue
+      - permanezca en línea
+      - no llame a su hija
+      - mantenga esto confidencial
+      - no avise a la familia
+      - manténgalo en secreto
+      - no contacte al banco
+      - no llame a la policía
+  payment_method:
+    speaker: caller
+    weight: 30
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - tarjeta de regalo
+      - tarjeta prepagada
+      - transferencia bancaria
+      - western union
+      - zelle
+      - bitcoin
+      - criptomoneda
+      - depósito en efectivo
+      - orden de pago
+      - tarjeta apple
+      - tarjeta google play
+  pii_request:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - número de cuenta
+      - tarjeta bancaria
+      - tarjeta de débito
+      - número de tarjeta
+      - número de medicare
+      - número de seguro social
+      - fecha de nacimiento
+      - contraseña
+      - código de seguridad
+      - código pin
+      - verificar su identidad
+      - verificar su cuenta
+      - confirmar su cuenta
+      - número de ruta
+      - léame el número
+      - confirme sus datos
+  remote_access:
+    speaker: caller
+    weight: 30
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - anydesk
+      - teamviewer
+      - descargue
+      - controlar su computadora
+      - compartir pantalla
+      - instale esto
+      - escritorio remoto
+      - darme acceso
+      - abra su navegador
+      - haga clic
+      - soporte remoto
+  family_emergency:
+    speaker: caller
+    weight: 25
+    half_life_s: 120
+    cap: 3
+    phrases:
+      - nieto
+      - nieta
+      - accidente
+      - cárcel
+      - fianza
+      - hospital
+      - abogado
+      - emergencia familiar
+      - choque de auto
+      - sala de emergencias
+      - su sobrino
+      - su nieto
+  threat:
+    speaker: caller
+    weight: 20
+    half_life_s: 90
+    cap: 3
+    phrases:
+      - arrestado
+      - arrestada
+      - acción legal
+      - vendrá la policía
+      - perderá sus beneficios
+      - emitir una orden
+      - confiscar su cuenta
+      - servicio suspendido
+      - beneficios cancelados
+      - cuenta congelada
+      - será deportado
+  compliance_cue:
+    speaker: senior
+    weight: 15
+    half_life_s: 60
+    cap: 3
+    phrases:
+      - buscaré mi bolso
+      - déjeme buscarlo
+      - mi tarjeta dice
+      - déjeme leerlo
+      - voy a buscarlo
+      - tengo la tarjeta
+      - buscaré mi cartera
+      - aquí está el número
+      - lo encontré
+      - puedo pagar
+  benign:
+    speaker: caller
+    weight: -20
+    half_life_s: 180
+    cap: 3
+    phrases:
+      - recordatorio de cita
+      - receta lista
+      - confirmar su cita
+      - soy su vecino
+      - entrega
+      - servicio de la iglesia
+      - almuerzo mañana
+      - cena familiar
+      - renovación del seguro
+      - recoger en farmacia
+      - paquete en camino
+      - encuesta comunitaria
+      - saber cómo está
+
+patterns:
+  pii_disclosure:
+    speaker: senior
+    weight: 40
+    half_life_s: 300
+    cap: 3
+    regex: '(?:\b\d{4,}\b|\b(?:\d[\s-]*){3,}\d\b|\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)?\d{2}\b)'
+
+combos:
+  - families: [authority_impersonation, urgency, pii_request]
+    minimum: 2
+    bonus: 15
+  - families: [payment_method, urgency]
+    minimum: 2
+    bonus: 20
+  - families: [pii_disclosure, pii_request, authority_impersonation]
+    required: [pii_disclosure]
+    minimum: 2
+    bonus: 25

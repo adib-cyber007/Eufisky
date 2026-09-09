@@ -8,6 +8,9 @@ _DIGITS = {
     "zero": "0", "oh": "0", "o": "0", "one": "1", "two": "2",
     "three": "3", "four": "4", "five": "5", "six": "6",
     "seven": "7", "eight": "8", "nine": "9",
+    "cero": "0", "uno": "1", "una": "1", "dos": "2", "tres": "3",
+    "cuatro": "4", "cinco": "5", "seis": "6", "siete": "7",
+    "ocho": "8", "nueve": "9",
 }
 _SYNONYMS = (
     (r"\bs\.?\s*s\.?\s*n\.?\b", "social security number"),
@@ -27,7 +30,7 @@ def normalize(text: str) -> str:
     value = text.lower().replace("’", "'")
     for pattern, replacement in _SYNONYMS:
         value = re.sub(pattern, replacement, value)
-    value = re.sub(r"[^a-z0-9/\-']+", " ", value)
+    value = re.sub(r"[^\w/\-']+", " ", value, flags=re.UNICODE).replace("_", " ")
     tokens = value.split()
     output: list[str] = []
     digit_run: list[str] = []

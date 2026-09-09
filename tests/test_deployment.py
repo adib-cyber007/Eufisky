@@ -30,6 +30,14 @@ def test_render_blueprint_is_one_free_python_web_service() -> None:
     assert env["AGENT_BACKEND"]["value"] == "voice_agent"
     assert env["SENIOR_NAME"]["value"] == "Margaret"
     assert env["FAMILY_NAME"]["value"] == "Sarah"
+    for flag in (
+        "FEATURE_INCIDENT_INSIGHTS",
+        "FEATURE_GUARDIAN_VOICE_TUNING",
+        "FEATURE_SPANISH_MONITORING",
+        "FEATURE_INCIDENT_EXPORT",
+        "FEATURE_TWILIO_TELEPHONY",
+    ):
+        assert env[flag]["value"] == "false"
     for secret in ("ASSEMBLYAI_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY"):
         assert env[secret] == {"key": secret, "sync": False}
 

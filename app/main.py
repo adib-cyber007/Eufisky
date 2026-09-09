@@ -4,14 +4,15 @@ from contextlib import asynccontextmanager
 import json
 from pathlib import Path
 import secrets
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Response, WebSocket
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
+from app.config import public_feature_flags, settings
+from app.incident_insights import build_insight_timeline
 from app import db
 from app.phone.calls import calls
 from app.phone.ws import dashboard_socket, phone_socket
@@ -51,7 +52,8 @@ class ReplayRequest(BaseModel):
 
 
 class RoomSettingsPatch(BaseModel):
-    always_ring_first: bool
+    always_ring_first: bool | None = None
+    language: Literal["en", "es"] | None = None
 
 
 @app.get("/api/health")
@@ -67,6 +69,13 @@ async def health() -> dict[str, bool | str]:
     }
 
 
+@app.get("/api/features")
+async def features_get() -> dict[str, bool]:
+    """Expose only off-by-default, non-secret browser feature switches."""
+
+    return public_feature_flags(settings)
+
+
 @app.get("/", response_class=FileResponse)
 async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -77,6 +86,15 @@ async def phone_page(page_name: str) -> FileResponse:
     if page_name not in {"caller", "senior", "family", "dashboard", "slides"}:
         raise HTTPException(status_code=404, detail="Page not found")
     return FileResponse(WEB_DIR / f"{page_name}.html")
+
+
+@app.get("/incident/{room}/{call_id}", response_class=FileResponse)
+async def incident_print_page(room: str, call_id: str) -> FileResponse:
+    if not settings.feature_incident_export:
+        raise HTTPException(status_code=404, detail="Incident export is not enabled")
+    if not db.get_call(call_id, room):
+        raise HTTPException(status_code=404, detail="Call not found")
+    return FileResponse(WEB_DIR / "incident.html")
 
 
 @app.websocket("/ws/phone")
@@ -102,15 +120,25 @@ async def contacts_list(room: str) -> list[dict]:
 
 
 @app.get("/api/rooms/{room}/settings")
-async def settings_get(room: str) -> dict[str, bool]:
-    return db.get_room_settings(room)
+async def settings_get(room: str) -> dict[str, Any]:
+    room_settings = db.get_room_settings(room)
+    if not settings.feature_spanish_monitoring:
+        room_settings.pop("language", None)
+    return room_settings
 
 
 @app.patch("/api/rooms/{room}/settings")
-async def settings_patch(room: str, room_settings: RoomSettingsPatch) -> dict[str, bool]:
-    return db.update_room_settings(
-        room, always_ring_first=room_settings.always_ring_first
+async def settings_patch(room: str, room_settings: RoomSettingsPatch) -> dict[str, Any]:
+    if room_settings.language == "es" and not settings.feature_spanish_monitoring:
+        raise HTTPException(status_code=403, detail="Spanish monitoring is not enabled")
+    saved = db.update_room_settings(
+        room,
+        always_ring_first=room_settings.always_ring_first,
+        language=room_settings.language,
     )
+    if not settings.feature_spanish_monitoring:
+        saved.pop("language", None)
+    return saved
 
 
 @app.post("/api/rooms/{room}/contacts", status_code=201)
@@ -143,6 +171,11 @@ async def calls_get(room: str, call_id: str) -> dict:
     result = db.call_detail(room, call_id)
     if not result:
         raise HTTPException(status_code=404, detail="Call not found")
+    features = public_feature_flags(settings)
+    result["features"] = features
+    incident = result.get("incident")
+    if incident and features["incident_insights"]:
+        incident["insight_timeline"] = build_insight_timeline(incident.get("analytics"))
     return result
 
 

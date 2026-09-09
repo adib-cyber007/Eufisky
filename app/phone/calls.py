@@ -46,13 +46,21 @@ class CallState(str, Enum):
 
 
 class CallSession:
-    def __init__(self, room: LiveRoom, caller_phone: str | None, label: str, classification: str) -> None:
+    def __init__(
+        self,
+        room: LiveRoom,
+        caller_phone: str | None,
+        label: str,
+        classification: str,
+        monitoring_language: str = "en",
+    ) -> None:
         self.room = room
         self.id = uuid.uuid4().hex
         self.caller_phone = caller_phone or ""
         self.label = label
         self.classification = classification
         self.monitored = classification == "unknown"
+        self.monitoring_language = monitoring_language
         self.state = CallState.IDLE
         self.started_monotonic = time.monotonic()
         self.held: set[str] = set()
@@ -121,6 +129,16 @@ class CallController:
         self.intro_delay = intro_delay
         self.senior_timeout = senior_timeout
 
+    def _monitoring_profile(self, room_name: str) -> tuple[str, dict[str, Any]]:
+        room_language = str(db.get_room_settings(room_name).get("language") or "en")
+        language = (
+            "es"
+            if settings.feature_spanish_monitoring and room_language == "es"
+            else "en"
+        )
+        lexicon = load_lexicon(language="es") if language == "es" else self.lexicon
+        return language, lexicon
+
     async def _transition(self, call: CallSession, state: CallState, trigger: str) -> None:
         previous = call.state
         call.state = state
@@ -158,7 +176,11 @@ class CallController:
                 await live.send_phone("caller", {"type": "ended", "reason": "Line is already busy"})
                 return live.current_call
             classification, label = db.classify_phone(room_name, caller_phone)
-            call = CallSession(live, caller_phone, label, classification)
+            monitoring_language, call_lexicon = self._monitoring_profile(room_name)
+            call = CallSession(
+                live, caller_phone, label, classification, monitoring_language
+            )
+            call.lexicon = call_lexicon
             live.current_call = call
             try:
                 db.create_call({
@@ -192,9 +214,10 @@ class CallController:
                 call.agent_sessions.open("front_door")
                 try:
                     call.frontdoor = FrontDoorSession(
-                        call, self.lexicon, self.backend_factory(),
+                        call, call.lexicon, self.backend_factory(),
                         lambda event, score: self._agent_tool(call, event, score),
                         self.stt_factory,
+                        language=call.monitoring_language,
                     )
                     await call.frontdoor.start()
                 except Exception:
@@ -341,10 +364,11 @@ class CallController:
                 await asyncio.sleep(self.intro_delay)
                 await self._transition(call, target, "intro_complete")
                 call.monitor = CallMonitor(
-                    call, self.lexicon, self.stt_factory, seed_score=call.seed_score,
+                    call, call.lexicon, self.stt_factory, seed_score=call.seed_score,
                     on_guardian=lambda update, trigger: self._start_guardian(call, update, trigger),
                     on_action=lambda name, args: self._guardian_action(call, name, args),
                     on_recommendation=lambda value: self._guardian_recommendation(call, value),
+                    language=call.monitoring_language,
                 )
                 await call.monitor.start()
             else:

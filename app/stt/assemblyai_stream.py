@@ -45,10 +45,17 @@ class STTStream:
     frames are replayed so words around the disconnect are not lost.
     """
 
-    def __init__(self, speaker: str, keyterms: list[str], sample_rate: int = 16000) -> None:
+    def __init__(
+        self,
+        speaker: str,
+        keyterms: list[str],
+        sample_rate: int = 16000,
+        language: str = "en",
+    ) -> None:
         self.speaker = speaker
         self.keyterms = [term for term in keyterms[:KEYTERM_LIMIT] if term]
         self.sample_rate = sample_rate
+        self.language = language if language in {"en", "es"} else "en"
         self._audio: asyncio.Queue[bytes | None] = asyncio.Queue()
         self._events: asyncio.Queue[WordEvent | TurnEndEvent | object] = asyncio.Queue()
         self._replay: deque[bytes] = deque(maxlen=20)
@@ -65,6 +72,10 @@ class STTStream:
             "format_turns": "true",
             "keyterms_prompt": json.dumps(self.keyterms),
         }
+        if self.language == "es":
+            # Universal-3.5 Pro remains multilingual; this documented list
+            # biases a monolingual room without changing the streaming model.
+            params["language_codes"] = json.dumps(["es"])
         return f"{BASE_URL}?{urlencode(params)}"
 
     async def start(self) -> None:

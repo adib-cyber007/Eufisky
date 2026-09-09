@@ -58,11 +58,12 @@ class CallMonitor:
         self,
         call: Any,
         lexicon: dict[str, Any],
-        stt_factory: Callable[[str, list[str], int], Any] = STTStream,
+        stt_factory: Callable[..., Any] = STTStream,
         seed_score: int = 0,
         on_guardian: Callable[[Any, str], Awaitable[None]] | None = None,
         on_action: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
         on_recommendation: Callable[[str], Awaitable[None]] | None = None,
+        language: str = "en",
     ) -> None:
         self.call = call
         self.engine = RuleEngine(lexicon, seed_score=seed_score)
@@ -77,6 +78,7 @@ class CallMonitor:
         self.guardian_turn: Callable[[str], Awaitable[None]] | None = None
         self.mode = "monitor"
         self.stt_factory = stt_factory
+        self.language = language
         self.keyterms = streaming_keyterms(
             lexicon,
             org_names=["Medicare", "Social Security", "IRS", "Walgreens"],
@@ -96,7 +98,11 @@ class CallMonitor:
     async def _start_leg(self, speaker: str) -> None:
         if self.closed or speaker in self.streams:
             return
-        stream = self.stt_factory(speaker, self.keyterms, 16000)
+        stream = (
+            self.stt_factory(speaker, self.keyterms, 16000, language=self.language)
+            if self.language != "en"
+            else self.stt_factory(speaker, self.keyterms, 16000)
+        )
         try:
             await stream.start()
         except Exception as error:

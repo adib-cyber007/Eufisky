@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/app.css?v=8">
+  <link rel="stylesheet" href="/static/css/app.css?v=9">
 </head>
 <body class="dashboard-page">
   <main class="dashboard-shell">
@@ -148,10 +148,22 @@
             <input id="always-ring-first" type="checkbox" role="switch">
           </label>
           <p id="settings-feedback" class="action-feedback" role="status" aria-live="polite"></p>
+          <div id="spanish-monitoring-setting" class="language-setting" hidden>
+            <label for="monitoring-language">
+              <strong>Monitoring language</strong>
+              <small>The Front Door and Guardian continue speaking English. This setting changes live transcription and scam-pattern monitoring only.</small>
+            </label>
+            <select id="monitoring-language">
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+            </select>
+            <p id="language-feedback" class="action-feedback" role="status" aria-live="polite"></p>
+          </div>
         </section>
       </section>
     </div>
   </main>
-  <script src="/static/js/dashboard.js?v=7"></script>
+  <script src="/static/js/incident-report.js?v=1"></script>
+  <script src="/static/js/dashboard.js?v=8"></script>
 </body>
 </html>

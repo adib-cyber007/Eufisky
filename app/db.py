@@ -20,7 +20,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
-    always_ring_first INTEGER NOT NULL DEFAULT 0
+    always_ring_first INTEGER NOT NULL DEFAULT 0,
+    language TEXT NOT NULL DEFAULT 'en' CHECK(language IN ('en','es'))
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +92,7 @@ def init_db() -> None:
             "always_ring_first",
             "INTEGER NOT NULL DEFAULT 0",
         )
+        _ensure_column(connection, "rooms", "language", "TEXT NOT NULL DEFAULT 'en'")
         _ensure_column(connection, "incidents", "redacted_audio", "TEXT")
         _ensure_column(
             connection,
@@ -264,21 +266,40 @@ def ensure_room(room: str) -> str:
     return room
 
 
-def get_room_settings(room: str) -> dict[str, bool]:
+def get_room_settings(room: str) -> dict[str, Any]:
     ensure_room(room)
     with _connect() as connection:
         row = connection.execute(
-            "SELECT always_ring_first FROM rooms WHERE id = ?", (room,)
+            "SELECT always_ring_first, language FROM rooms WHERE id = ?", (room,)
         ).fetchone()
-    return {"always_ring_first": bool(row["always_ring_first"]) if row else False}
+    return {
+        "always_ring_first": bool(row["always_ring_first"]) if row else False,
+        "language": str(row["language"] or "en") if row else "en",
+    }
 
 
-def update_room_settings(room: str, *, always_ring_first: bool) -> dict[str, bool]:
+def update_room_settings(
+    room: str,
+    *,
+    always_ring_first: bool | None = None,
+    language: str | None = None,
+) -> dict[str, Any]:
     ensure_room(room)
+    updates: dict[str, Any] = {}
+    if always_ring_first is not None:
+        updates["always_ring_first"] = int(always_ring_first)
+    if language is not None:
+        normalized = language.strip().casefold()
+        if normalized not in {"en", "es"}:
+            raise ValueError("language must be 'en' or 'es'")
+        updates["language"] = normalized
+    if not updates:
+        return get_room_settings(room)
+    clause = ", ".join(f"{column} = ?" for column in updates)
     with _connect() as connection:
         connection.execute(
-            "UPDATE rooms SET always_ring_first = ? WHERE id = ?",
-            (int(always_ring_first), room),
+            f"UPDATE rooms SET {clause} WHERE id = ?",
+            (*updates.values(), room),
         )
     return get_room_settings(room)
 

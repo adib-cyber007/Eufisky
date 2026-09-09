@@ -28,6 +28,7 @@ class FrontDoorSession:
         backend: AgentBackend,
         on_tool: Callable[[dict[str, Any], int], Awaitable[None]],
         stt_factory: Any = STTStream,
+        language: str = "en",
     ) -> None:
         self.call = call
         self.backend = backend
@@ -39,7 +40,11 @@ class FrontDoorSession:
             org_names=["Medicare", "Social Security", "IRS", "Walgreens"],
             people_names=[settings.senior_name, settings.family_name],
         )
-        self.stream = stt_factory("caller", self.keyterms, 16000)
+        self.stream = (
+            stt_factory("caller", self.keyterms, 16000, language=language)
+            if language != "en"
+            else stt_factory("caller", self.keyterms, 16000)
+        )
         self.tasks: list[asyncio.Task[Any]] = []
         self.filler: asyncio.Task[None] | None = None
         self.agent_activity = asyncio.Event()

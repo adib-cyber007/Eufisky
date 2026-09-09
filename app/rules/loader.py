@@ -8,10 +8,13 @@ from typing import Any
 import yaml
 
 LEXICON_PATH = Path(__file__).with_name("lexicon.yaml")
+SPANISH_LEXICON_PATH = Path(__file__).with_name("lexicon.es.yaml")
 KEYTERM_LIMIT = 100
 
 
-def load_lexicon(path: Path = LEXICON_PATH) -> dict[str, Any]:
+def load_lexicon(path: Path = LEXICON_PATH, *, language: str = "en") -> dict[str, Any]:
+    if path == LEXICON_PATH and language == "es":
+        path = SPANISH_LEXICON_PATH
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data.get("signals"), dict):
         raise ValueError("lexicon must contain a signals mapping")
