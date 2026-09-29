@@ -354,6 +354,23 @@ async def process_call(
         summary = template_summary(call)
         summary_source = "template"
 
+    # Call controls are recorded by the state machine; a transcript alone cannot
+    # establish whether Guardian paused the caller or Sarah joined.
+    events = db.list_events(call_id)
+    if any(event["type"] == "state" and event["payload"].get("to") == "GUARDIAN" for event in events):
+        summary["intervention"] = f"Eufisky paused the caller and spoke privately with {settings.senior_name}."
+    elif any(event["type"] == "level" and event["payload"].get("level") == 1 for event in events):
+        summary["intervention"] = f"Eufisky sent {settings.senior_name} a private warning while the call continued."
+    family_joined = any(event["type"] == "family" and event["payload"].get("event") == "joined" for event in events)
+    outcome = (
+        f"{settings.family_name} joined {settings.senior_name} while the caller remained on hold. "
+        if family_joined else ""
+    )
+    if any(event["type"] == "tool" and event["payload"].get("name") == "end_call" for event in events):
+        summary["outcome"] = outcome + "Eufisky ended the call."
+    elif family_joined:
+        summary["outcome"] = outcome + "The call later ended."
+
     redacted_audio_path: str | None = None
     if batch.redacted_audio:
         destination = RECORDINGS_DIR / f"{call_id}_redacted.wav"

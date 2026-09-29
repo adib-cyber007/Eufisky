@@ -4,3 +4,6 @@ requests_made, disclosed_by_senior, intervention, outcome, recommendation.
 requests_made must be an array of short strings. Every other value must be a
 plain string. Do not restore, infer, or repeat redacted personal information.
 Distinguish what the caller claimed from what was verified. Use calm language.
+For requests_made, include only requests spoken by Caller. Do not treat a
+request by Margaret or Family as a request from the caller. Do not invent call
+control actions from the transcript.

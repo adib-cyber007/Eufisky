@@ -409,16 +409,19 @@
     }
   }
 
-  function resetLive(callId) {
+  function resetLive(callId, classification) {
     currentCallId = callId;
     seenTranscript.clear();
     seenTimeline.clear();
     lastBubble = null;
     $("#live-feed").className = "transcript-stream empty";
-    $("#live-feed").textContent = "Listening for the first words…";
-    $("#timeline-list").innerHTML = '<li class="empty">Call connected. Monitoring begins after Margaret answers.</li>';
-    $("#live-state").textContent = "SCREENING";
-    $("#live-classification").textContent = "Unknown caller is being screened";
+    const trusted = classification === "trusted";
+    $("#live-feed").textContent = trusted ? "Trusted calls stay private. No transcript is captured." : "Listening for the first words…";
+    $("#timeline-list").innerHTML = trusted
+      ? '<li class="empty">Trusted caller routed privately.</li>'
+      : '<li class="empty">Call connected. Monitoring begins after Margaret answers.</li>';
+    $("#live-state").textContent = trusted ? "RINGING_SENIOR" : "SCREENING";
+    $("#live-classification").textContent = trusted ? "Trusted call — private" : "Unknown caller is being screened";
     updateRisk({ score: 0, signals: [], evidence: [] });
   }
 
@@ -522,7 +525,7 @@
       }
       return;
     }
-    if (message.type === "call" && message.event === "started") resetLive(message.call_id);
+    if (message.type === "call" && message.event === "started") resetLive(message.call_id, message.classification);
     if (message.type === "call") {
       if (!message.replay) loadHistory();
       if (message.event === "ended") $("#guardian-banner").hidden = true;

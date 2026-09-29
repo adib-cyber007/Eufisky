@@ -94,10 +94,14 @@ number is blocked.”
 4. Open **View redacted transcript** and point to the hidden digit run such as
    `####`. If redacted audio is available, press Play briefly.
 
-Say: “After the call, AssemblyAI creates a multichannel transcript, removes
-personal information from text and audio, and produces a family-readable incident
-summary. If either provider step is unavailable, Eufisky clearly flags a local
-template fallback instead of leaving the family with nothing.”
+Type-to-talk creates no recording. In a typed run, Eufisky masks digit runs in
+the live transcript before the LLM Gateway summary; microphone audio can use
+AssemblyAI batch text and audio redaction.
+
+Say: “After this typed call, Eufisky masks digit runs and asks AssemblyAI's LLM
+Gateway for a family-readable summary. With microphone audio, it also requests
+AssemblyAI batch text and audio redaction. If those steps fail, a local template
+keeps the report available.”
 
 ## Replay fallback — no microphones or live call required
 

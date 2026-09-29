@@ -87,6 +87,7 @@ formula, escalation ladder, and data model.
 - Unknown calls are processed only after screening and connection.
 - Caller and senior audio stay on separate legs; risk evidence records the speaker and phrase that changed the score.
 - Post-call analysis requests entity-name PII substitution before summary generation.
+- Type-to-talk has no recorded audio; its live transcript receives local digit redaction before summary generation.
 - Raw call recordings are deleted after post-call processing; Render demo storage is temporary and resets may erase demo data.
 - The demo has no accounts or authentication. Use invented information only.
 
@@ -127,7 +128,7 @@ Add an AssemblyAI API key to `.env`; never commit that file. Then open
 .\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com
 ```
 
-The checked-in release passes 83 tests. The public smoke tool verifies health,
+The checked-in release passes 84 tests. The public smoke tool verifies health,
 SQLite access, every page, secure dashboard WebSockets, Replay events, and
 completion.
 

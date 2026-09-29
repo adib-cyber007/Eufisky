@@ -157,10 +157,15 @@ telcos, insurers, banks, and senior-living operators.
 
 ### 10. What did you validate?
 
-The full local suite passes 83 tests. The public smoke test verifies health,
+The full local suite passes 84 tests. The public smoke test verifies health,
 database access, all pages, secure Dashboard WebSockets, Replay evidence,
 transcript, state and tool events, and completion. A two-device HTTPS
 microphone/voice call also passed.
+
+On 2026-09-30, a separate public type-to-talk run also verified the trusted
+call bypass, Front Door, risk escalation, Guardian hold, Sarah's private join,
+and report creation. Typed calls use live text with digit runs masked because they
+do not record microphone audio.
 
 ## Three-minute video shot list
 
@@ -182,7 +187,7 @@ or Replay; both are part of the product.
 | 1:54–2:12 | Margaret tab as Guardian speaks; show Caller tab on hold briefly | “That combination—authority, urgency, a private-data request, and a compliance cue—crosses the intervention rule. The caller is paused while Guardian speaks only to Margaret.” |
 | 2:12–2:19 | Margaret tab, type-to-talk | “Please get Sarah.” |
 | 2:19–2:31 | Sarah tab; click Join call, then show Dashboard state | “Guardian acts through tools. It can resume, call family, end the call, or trust the caller. Here, Sarah joins without the caller hearing the private check-in.” |
-| 2:31–2:45 | End the call; Dashboard History tab, open the newest incident | “After the call, AssemblyAI requests PII-redacted text and audio. A LeMUR-style summary through the LLM Gateway creates this plain-English incident report, with a template fallback.” |
+| 2:31–2:45 | End the call; Dashboard History tab, open the newest incident | “This typed call masks digit runs before AssemblyAI's LLM Gateway writes the report. The app records the actual Guardian actions. With microphone audio, batch processing also requests PII-redacted text and audio.” |
 | 2:45–2:55 | Dashboard incident; point to redacted transcript and evidence timeline | “The family sees what happened, which phrases changed risk, what Eufisky did, and whether any sensitive detail was detected—without exposing captured numbers.” |
 | 2:55–3:00 | Final slide or landing page | “Eufisky is a steady voice inside the call. Next: real phone lines, Spanish, and a family app.” |
 

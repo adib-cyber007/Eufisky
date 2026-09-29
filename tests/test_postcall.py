@@ -114,3 +114,25 @@ async def test_provider_failures_use_redacted_live_transcript_and_template(postc
     assert "####" in incident["redacted_transcript"]
     assert set(pipeline.SUMMARY_KEYS) == set(incident["summary"])
     assert not caller.exists() and not senior.exists()
+
+
+@pytest.mark.asyncio
+async def test_recorded_actions_correct_inaccurate_ai_summary(postcall_setup) -> None:
+    call_id, _, _ = postcall_setup
+    db.add_event(call_id, 2000, "state", {"to": "GUARDIAN"})
+    db.add_event(call_id, 3000, "family", {"event": "joined"})
+    db.add_event(call_id, 4000, "tool", {"name": "end_call"})
+
+    async def fake_batch(_stereo: Path) -> pipeline.BatchResult:
+        return pipeline.BatchResult("Caller: Verify your account.", {})
+
+    async def fake_summary(_transcript: str) -> dict:
+        return {**complete_summary(), "intervention": "The caller stayed connected.", "outcome": "No one joined."}
+
+    incident = await pipeline.process_call(
+        call_id, batch_runner=fake_batch, summary_runner=fake_summary
+    )
+
+    assert incident is not None
+    assert incident["summary"]["intervention"] == "Eufisky paused the caller and spoke privately with Margaret."
+    assert incident["summary"]["outcome"] == "Sarah joined Margaret while the caller remained on hold. Eufisky ended the call."
