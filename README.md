@@ -22,7 +22,12 @@ without monitoring the people they already trust.
 [API health](https://eufisky.onrender.com/api/health)
 
 The free Render service may need about 40 seconds to wake after a quiet period.
-Once it is warm, try the complete story in about 60 seconds:
+Once it is warm, click **Watch a replay in one click** on the landing page. It
+opens a fresh room and plays a prerecorded call without a microphone or other
+tabs. Open **History** when Replay ends to inspect a preloaded redacted incident
+report.
+
+For a guided dashboard walkthrough:
 
 1. Open the [Family Dashboard](https://eufisky.onrender.com/dashboard?room=demo).
 2. Confirm the header says **Live · room demo**.
@@ -122,7 +127,7 @@ Add an AssemblyAI API key to `.env`; never commit that file. Then open
 .\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com
 ```
 
-The checked-in release passes 77 tests. The public smoke tool verifies health,
+The checked-in release passes 83 tests. The public smoke tool verifies health,
 SQLite access, every page, secure dashboard WebSockets, Replay events, and
 completion.
 

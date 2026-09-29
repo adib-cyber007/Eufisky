@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import secrets
 
 from fastapi.testclient import TestClient
 import pytest
@@ -61,6 +62,35 @@ async def test_replay_publishes_in_order_at_selected_speed(
     assert [message["t_ms"] for message in published] == [1000, 3000]
     assert all(message["replay"] is True for message in published)
     assert published[1]["final"] is True
+
+
+@pytest.mark.asyncio
+async def test_fresh_demo_rooms_keep_replay_separate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "DB_PATH", tmp_path / "judge-rooms.db")
+    room_ids = iter(["judge-one", "judge-two"])
+    monkeypatch.setattr(secrets, "token_hex", lambda _: next(room_ids))
+    with TestClient(app) as client:
+        first = client.post("/api/rooms/new").json()["room"]
+        second = client.post("/api/rooms/new").json()["room"]
+    assert first != second
+
+    first_dashboard, second_dashboard = FakeDashboard(), FakeDashboard()
+    rooms.register_dashboard(first, first_dashboard)
+    rooms.register_dashboard(second, second_dashboard)
+
+    async def no_wait(_: float) -> None:
+        pass
+
+    try:
+        await play_events(first, [{"type": "risk", "t_ms": 1000, "score": 65}], sleep=no_wait)
+    finally:
+        rooms.unregister_dashboard(first, first_dashboard)
+        rooms.unregister_dashboard(second, second_dashboard)
+
+    assert any(message.get("score") == 65 for message in first_dashboard.messages)
+    assert second_dashboard.messages == []
 
 
 def test_replay_rejects_paths_outside_data() -> None:

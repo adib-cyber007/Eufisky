@@ -157,7 +157,7 @@ telcos, insurers, banks, and senior-living operators.
 
 ### 10. What did you validate?
 
-The full local suite passes 77 tests. The public smoke test verifies health,
+The full local suite passes 83 tests. The public smoke test verifies health,
 database access, all pages, secure Dashboard WebSockets, Replay evidence,
 transcript, state and tool events, and completion. A two-device HTTPS
 microphone/voice call also passed.

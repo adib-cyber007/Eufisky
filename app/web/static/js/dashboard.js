@@ -1,6 +1,7 @@
 (function () {
   const requestedRoom = new URLSearchParams(location.search).get("room");
   const room = requestedRoom?.trim() || "demo";
+  let autoReplay = new URLSearchParams(location.search).get("replay") === "1";
   const $ = (selector) => document.querySelector(selector);
   const seenTranscript = new Set();
   const seenTimeline = new Set();
@@ -516,7 +517,7 @@
         resetLive("replay-demo");
         $("#replay-status").textContent = "Replay running…";
       } else {
-        $("#replay-status").textContent = "Replay complete.";
+        $("#replay-status").textContent = "Replay complete. Open History for a sample incident report.";
         $("#replay-demo").disabled = false;
       }
       return;
@@ -544,6 +545,11 @@
       $("#live-state").textContent = message.to || "IDLE";
       $("#live-classification").textContent = message.classification || message.trigger || "Call state changed";
       if (message.trigger !== "snapshot") addTimeline(message);
+      if (message.trigger === "snapshot" && autoReplay) {
+        autoReplay = false;
+        $("#replay-speed").value = "4";
+        $("#replay-demo").click();
+      }
     }
     if (message.type === "transcript" || message.type === "caption") addTranscript(message);
     if (message.type === "risk") updateRisk(message);

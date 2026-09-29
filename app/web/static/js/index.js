@@ -11,6 +11,19 @@ function updateLinks() {
 }
 
 roomInput.addEventListener("input", updateLinks);
+document.querySelector("#watch-demo").addEventListener("click", async (event) => {
+  event.preventDefault();
+  const link = event.currentTarget;
+  link.textContent = "Preparing your demo…";
+  try {
+    const response = await fetch("/api/rooms/new", { method: "POST" });
+    if (!response.ok) throw new Error("Room creation failed");
+    const { room } = await response.json();
+    location.assign(`/dashboard?room=${encodeURIComponent(room)}&replay=1`);
+  } catch (error) {
+    location.assign(`/dashboard?room=${encodeURIComponent(roomInput.value.trim() || "demo")}&replay=1`);
+  }
+});
 document.querySelector("#new-room").addEventListener("click", async () => {
   const response = await fetch("/api/rooms/new", { method: "POST" });
   const data = await response.json();
