@@ -1,0 +1,28 @@
+Eufisky demo narration — synthetic voice; scripted Replay disclosed
+
+Segment 1
+Meet Eufisky, a voice guardian for older adults, built around Assembly AI. The idea is simple: when an unfamiliar caller pressures someone, offer understandable help during the conversation. This submission demonstrates our browser prototype. The narrated recording includes a scripted Replay, and does not claim to measure live provider performance.
+
+Segment 2
+Consider Margaret. A stranger calls claiming that her Medicare benefits will be suspended today. The danger develops after she answers, through urgency, threats, and requests for personal information. Eufisky explores a practical response: recognize those signals, explain the concern, and create a path to a trusted family member. Our objective is support at the moment of pressure, while preserving the older adult's choice.
+
+Segment 3
+Trusted contacts bypass AI processing. Unknown callers first meet a Front Door agent that asks who is calling and why. Once connected, separate audio legs give caller and senior transcripts a known identity. A deterministic risk engine combines phrases, time decay, and contextual bonuses. When intervention rules fire, the caller is held while Guardian offers private guidance. The dashboard exposes evidence and the timeline so the family can understand what happened.
+
+Segment 4
+Assembly AI is central to the implementation. The Voice Agent API supports Front Door and Guardian conversations. Universal Streaming transcribes each connected audio leg, with keyterm prompting for relevant vocabulary. After an unknown call, batch processing requests redacted transcripts and audio, and LLM Gateway supports a structured incident summary. Groq, Gemini, and deterministic fallback paths help the prototype handle provider failures. These fallbacks are disclosed because a working Replay alone does not prove that every hosted integration ran.
+
+Segment 5
+Here is an actual recording of the local dashboard running Replay at twice normal speed. The entire story is scripted. The stranger claims authority, threatens lost benefits, and asks for account numbers. Risk evidence accumulates alongside the conversation. The timeline shows the intervention: the caller is paused, Guardian explains the concern, and Margaret asks for Sarah. The scripted story then brings Sarah into the conversation and ends the call. The dashboard preserves the sequence for review. This demonstrates the interface and event flow; it is not a real telephone call or a live speech recognition benchmark.
+
+Segment 6
+The first customer hypothesis is an adult child supporting an older parent. A family subscription could offer reassurance and a shared view of concerning calls. Potential partners include senior living organizations and financial services. These are hypotheses to validate through interviews and pilots. Pricing requires measured usage, carrier charges, infrastructure, and support costs. We have not demonstrated prevented financial losses or commercial demand.
+
+Segment 7
+Our local test suite passes eighty five tests. An offline rules evaluation also covers sixty constructed scam scripts and forty benign scripts. All scam fixtures reached intervention, while the benign fixtures did not. These results check expected behavior on our examples; they do not establish real world accuracy. Public smoke checks passed for health, pages, dashboard connectivity, and the Replay event story. The next evaluation must include representative audio, accents, interruptions, and outages.
+
+Segment 8
+Today Eufisky is an English first browser simulation, with optional Spanish monitoring. Real phone integration through Twilio or another carrier is future work. Before real world use, priorities include consent hardening, authenticated households, stronger caller identity, and complete privacy lifecycle controls. We also need to measure false interventions and recovery behavior. Those steps turn a promising demonstration into evidence for a responsible pilot.
+
+Segment 9
+Eufisky's focus is private assistance, understandable evidence, and a trusted person when a conversation becomes concerning. The public browser demo and source repository are linked in this deck and the submission copy. Try Replay to inspect the story without microphone setup. Thank you for reviewing Eufisky, built with Assembly AI.

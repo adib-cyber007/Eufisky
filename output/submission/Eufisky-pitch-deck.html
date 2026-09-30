@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eufisky — Hackathon deck</title>
+  <meta name="description" content="Eufisky hackathon presentation: a voice agent that guards an older adult's phone line.">
+  
+  
+  
+  
+  
+  <style>
+    :root {
+      --void: #12151c;
+      --ink: #1a1e27;
+      --paper: #f4efe6;
+      --cream: #ece5d8;
+      --white: #fffdf8;
+      --line: rgba(26, 30, 39, .12);
+      --muted: #6d7480;
+      --ice: #d7e4ef;
+      --teal: #1f4e5f;
+      --blue: #3d7ea6;
+      --gold: #c9a227;
+      --gold-soft: #efc56a;
+      --coral: #d45a3c;
+      --mint: #2f8f6b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--void);
+    }
+    body.reveal-viewport,
+    html.reveal-print body,
+    html.reveal-print .reveal .slides .pdf-page,
+    html.reveal-print .reveal .slides section {
+      background: var(--void) !important;
+    }
+    .reveal {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--void);
+      font-family: Manrope, "Segoe UI", sans-serif;
+      font-size: 28px;
+    }
+    .reveal .slides { text-align: left; }
+    .reveal .slides > section {
+      height: 100%;
+      padding: 48px 64px 44px;
+      overflow: hidden;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .reveal .slides > section.dark {
+      background:
+        radial-gradient(ellipse at 88% -10%, rgba(201, 162, 39, .18), transparent 42%),
+        radial-gradient(ellipse at 0% 110%, rgba(31, 78, 95, .45), transparent 50%),
+        var(--void);
+      color: var(--paper);
+    }
+    .reveal h1, .reveal h2, .reveal h3 {
+      margin: 0;
+      color: inherit;
+      font-family: Fraunces, Georgia, serif;
+      font-weight: 600;
+      letter-spacing: -.03em;
+      text-transform: none;
+    }
+    .reveal h1 { max-width: 920px; font-size: 3.15em; line-height: .92; }
+    .reveal h2 { max-width: 920px; font-size: 1.72em; line-height: 1.05; }
+    .reveal h3 { font-size: .92em; line-height: 1.15; }
+    .reveal p { margin: 0; line-height: 1.4; }
+    .reveal a { color: var(--blue); text-decoration-thickness: 2px; }
+    .reveal small { color: var(--muted); font-size: .48em; line-height: 1.4; }
+    .reveal table { width: 100%; margin: 0; border-collapse: collapse; font-size: .5em; }
+    .reveal th, .reveal td {
+      padding: .78em .7em;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .reveal th {
+      color: var(--teal);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: .82em;
+    }
+    .reveal .progress { height: 3px; color: var(--gold); }
+    .reveal .controls { color: var(--gold); }
+    .slide-number {
+      color: var(--muted) !important;
+      background: transparent !important;
+      font-size: 12px !important;
+    }
+    .chapter {
+      display: inline-flex;
+      align-items: center;
+      gap: .45em;
+      margin-bottom: 18px;
+      padding: .35em .7em .35em .4em;
+      color: var(--teal);
+      background: var(--cream);
+      border-radius: 999px;
+      font-size: .38em;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .chapter b {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      color: var(--paper);
+      background: var(--teal);
+      border-radius: 50%;
+      letter-spacing: 0;
+    }
+    .dark .chapter { color: var(--gold-soft); background: rgba(255,255,255,.08); }
+    .dark .chapter b { color: var(--void); background: var(--gold-soft); }
+    .bottom-note {
+      position: absolute;
+      right: 64px;
+      bottom: 22px;
+      left: 64px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: .34em;
+      letter-spacing: .04em;
+    }
+    .dark .bottom-note { color: rgba(244, 239, 230, .55); }
+
+    .title-grid {
+      display: grid;
+      grid-template-columns: 1fr 210px;
+      gap: 48px;
+      align-items: center;
+      height: calc(100% - 18px);
+    }
+    .kicker {
+      margin-bottom: 18px;
+      color: var(--gold-soft);
+      font-size: .42em;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .title-lockup p {
+      max-width: 720px;
+      margin-top: .7em;
+      color: var(--ice);
+      font-size: .68em;
+    }
+    .built-on {
+      display: inline-flex;
+      gap: .5em;
+      align-items: center;
+      margin-top: 2.2em;
+      padding: .55em .9em;
+      color: var(--void);
+      background: var(--gold-soft);
+      border-radius: 999px;
+      font-size: .42em;
+      font-weight: 800;
+    }
+    .mark {
+      width: 210px;
+      height: 210px;
+      filter: drop-shadow(0 18px 40px rgba(0,0,0,.28));
+    }
+    .pulse-line {
+      position: absolute;
+      right: 0;
+      bottom: 72px;
+      left: 0;
+      height: 1px;
+      background: rgba(239, 197, 106, .22);
+    }
+    .pulse-line::after {
+      content: "";
+      position: absolute;
+      left: 58%;
+      width: 240px;
+      height: 64px;
+      transform: translateY(-32px);
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 64'%3E%3Cpath d='M0 32h56l12-22 16 44 14-36 12 14h130' fill='none' stroke='%23efc56a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: .78fr 1.22fr;
+      gap: 48px;
+      align-items: end;
+      height: calc(100% - 118px);
+    }
+    .big-stat strong {
+      display: block;
+      color: var(--coral);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 4.4em;
+      font-weight: 600;
+      letter-spacing: -.06em;
+      line-height: .8;
+    }
+    .big-stat p { max-width: 390px; margin-top: .85em; color: var(--muted); font-size: .62em; }
+    .story {
+      position: relative;
+      min-height: 320px;
+      padding: 1.35em 1.4em 1.2em 1.5em;
+      color: var(--paper);
+      background: var(--teal);
+      border-radius: 8px 36px 8px 8px;
+    }
+    .story::before {
+      content: "“";
+      position: absolute;
+      top: 4px;
+      left: 16px;
+      color: rgba(244, 239, 230, .16);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 6.4em;
+      line-height: 1;
+    }
+    .story p {
+      position: relative;
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1.02em;
+      line-height: 1.32;
+    }
+    .story footer {
+      position: absolute;
+      right: 32px;
+      bottom: 26px;
+      left: 44px;
+      color: rgba(244, 239, 230, .7);
+      font-size: .4em;
+    }
+
+    .demo-frame {
+      display: grid;
+      grid-template-columns: .78fr 1.22fr;
+      height: 430px;
+      margin-top: 22px;
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(26, 30, 39, .08);
+    }
+    .meter {
+      position: relative;
+      padding: 32px;
+      color: var(--paper);
+      background: linear-gradient(165deg, #24323c, #141820);
+    }
+    .meter strong {
+      display: block;
+      margin-top: 28px;
+      font-family: Fraunces, Georgia, serif;
+      font-size: 3.8em;
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -.06em;
+    }
+    .meter > span { color: var(--ice); font-size: .42em; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .meter-bar {
+      height: 8px;
+      margin-top: 18px;
+      overflow: hidden;
+      background: rgba(255,255,255,.12);
+      border-radius: 99px;
+    }
+    .meter-bar i {
+      display: block;
+      width: 74%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold-soft), var(--coral));
+    }
+    .signal {
+      display: inline-block;
+      margin: 14px 6px 0 0;
+      padding: 7px 11px;
+      color: var(--paper);
+      background: rgba(212, 90, 60, .28);
+      border-radius: 99px;
+      font-size: .34em;
+      font-weight: 700;
+    }
+    .transcript { padding: 26px 30px; background: var(--white); }
+    .transcript h3 { color: var(--ink); }
+    .bubble {
+      width: 86%;
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: var(--cream);
+      border-radius: 4px 16px 16px 16px;
+      font-size: .48em;
+      line-height: 1.4;
+    }
+    .bubble.senior {
+      margin-left: auto;
+      background: #e7f3ec;
+      border-radius: 16px 4px 16px 16px;
+    }
+    .guardian-strip {
+      margin-top: 20px;
+      padding: 12px 14px;
+      color: #8a352a;
+      background: #f8e4dc;
+      border-radius: 12px;
+      font-size: .42em;
+      font-weight: 800;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 36px;
+    }
+    .flow-node {
+      min-height: 268px;
+      padding: 24px;
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+    }
+    .flow-node.voice { border-top: 5px solid var(--blue); }
+    .flow-node.risk { border-top: 5px solid var(--gold); }
+    .flow-node.guard { border-top: 5px solid var(--coral); }
+    .flow-node p { margin-top: 12px; color: var(--muted); font-size: .46em; }
+    .step {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      margin-bottom: 18px;
+      color: var(--paper);
+      background: var(--ink);
+      border-radius: 50%;
+      font-size: .42em;
+      font-weight: 800;
+    }
+    .leg-lines { display: grid; gap: 8px; margin-top: 18px; }
+    .leg-lines span {
+      padding: 7px 10px;
+      color: var(--teal);
+      background: var(--cream);
+      border-radius: 8px;
+      font-size: .36em;
+      font-weight: 700;
+    }
+
+    .assembly-table { margin-top: 28px !important; background: var(--white); border-radius: 16px; overflow: hidden; }
+    .assembly-table th, .assembly-table td { padding: .85em .9em; }
+    .assembly-table td:first-child { width: 24%; color: var(--ink); font-weight: 800; }
+    .assembly-table td:nth-child(2) { width: 30%; color: var(--teal); }
+    .assembly-table td:last-child { color: var(--muted); }
+
+    .original-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+      height: calc(100% - 118px);
+    }
+    .not-list { padding: 0; list-style: none; }
+    .not-list li {
+      margin: .55em 0;
+      color: var(--muted);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1em;
+    }
+    .not-list s { color: #8a9099; text-decoration-color: var(--coral); text-decoration-thickness: 3px; }
+    .original-core {
+      display: grid;
+      place-items: center;
+      min-height: 340px;
+      padding: 1.6em;
+      color: var(--void);
+      background: var(--gold-soft);
+      border-radius: 28px;
+      text-align: center;
+    }
+    .original-core p { font-family: Fraunces, Georgia, serif; font-size: 1.12em; line-height: 1.2; }
+    .original-core small { display: block; margin-top: 16px; color: #4c432b; }
+
+    .value-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 36px;
+      align-items: stretch;
+      height: calc(100% - 118px);
+    }
+    .buyers { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .buyer {
+      min-height: 132px;
+      padding: 18px;
+      background: var(--white);
+      border-radius: 16px;
+      border-left: 4px solid var(--blue);
+    }
+    .buyer:nth-child(2) { border-left-color: var(--mint); }
+    .buyer:nth-child(3) { border-left-color: var(--gold); }
+    .buyer:nth-child(4) { border-left-color: var(--coral); }
+    .buyer b { display: block; font-family: Fraunces, Georgia, serif; font-size: .78em; }
+    .buyer span { display: block; margin-top: 8px; color: var(--muted); font-size: .36em; line-height: 1.4; }
+    .value-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 28px;
+      background: var(--teal);
+      color: var(--paper);
+      border-radius: 20px;
+    }
+    .value-copy h3 { color: var(--gold-soft); }
+    .value-copy p { margin-top: .8em; color: var(--ice); font-size: .58em; }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 36px;
+    }
+    .milestone {
+      min-height: 280px;
+      padding: 24px;
+      background: var(--white);
+      border-radius: 20px;
+    }
+    .milestone .idx {
+      display: block;
+      margin-bottom: 28px;
+      color: var(--gold);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1.4em;
+    }
+    .milestone p { margin-top: 12px; color: var(--muted); font-size: .46em; }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 48px;
+      align-items: center;
+      height: calc(100% - 18px);
+    }
+    .team-name {
+      margin-top: .7em !important;
+      color: var(--gold-soft);
+      font-family: Fraunces, Georgia, serif;
+      font-size: 1.05em;
+    }
+    .link-board { display: grid; gap: 12px; }
+    .link-board a {
+      display: block;
+      padding: 18px 22px;
+      color: var(--paper);
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(244,239,230,.1);
+      border-left: 5px solid var(--blue);
+      border-radius: 14px;
+      text-decoration: none;
+      font-size: .5em;
+    }
+    .link-board a:nth-child(2) { border-left-color: var(--gold-soft); }
+    .link-board a:nth-child(3) { border-left-color: var(--mint); }
+    .link-board a small { display: block; margin-top: 4px; color: rgba(244,239,230,.55); }
+    .print-tip { margin-top: 22px !important; color: rgba(244,239,230,.5); font-size: .38em; }
+
+    @media (max-width: 900px) {
+      .reveal .slides > section { padding-right: 36px; padding-left: 36px; }
+      .reveal { font-size: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+    @media print {
+      .reveal .slides > section { background: var(--paper) !important; }
+      .reveal .slides > section.dark { background: var(--void) !important; }
+      a { text-decoration: none !important; }
+    }
+  </style>
+<style>
+html,body{margin:0;width:1280px;height:720px;overflow:hidden}
+.reveal{font-family:"Segoe UI",Arial,sans-serif}
+.reveal h1,.reveal h2,.reveal h3{font-family:Georgia,serif}
+.reveal .slides{position:relative;width:1280px;height:720px}
+.reveal .slides>section{position:absolute;inset:0;display:none;width:1280px;height:720px}
+.reveal .slides>section.active{display:block}
+.slide-counter{position:fixed;right:24px;bottom:14px;color:#808895;font:12px "Segoe UI";z-index:10}
+@page{size:1280px 720px;margin:0}
+@media print{html,body,.reveal,.reveal .slides{height:auto!important;overflow:visible!important;width:1280px!important}.reveal .slides>section{display:block!important;position:relative!important;break-after:page;width:1280px!important;height:720px!important;margin:0!important}.reveal .slides>section:last-child{break-after:auto}.slide-counter{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section class="dark">
+        <div class="title-grid">
+          <div class="title-lockup">
+            <p class="kicker">Voice agents challenge</p>
+            <h1>Eufisky</h1>
+            <p>A voice agent that guards Mom's phone line—screening strangers, recognizing scam pressure, and stepping in privately.</p>
+            <span class="built-on">Built on AssemblyAI</span>
+          </div>
+          <svg class="mark" viewBox="0 0 210 210" role="img" aria-label="Eufisky mark">
+            <rect width="210" height="210" rx="48" fill="#efc56a"/>
+            <rect x="58" y="36" width="94" height="138" rx="22" fill="#12151c"/>
+            <circle cx="105" cy="148" r="8" fill="#efc56a"/>
+            <path d="M78 92c8-18 46-18 54 0" fill="none" stroke="#d7e4ef" stroke-width="6" stroke-linecap="round"/>
+            <path d="M86 104c6-10 32-10 38 0" fill="none" stroke="#d7e4ef" stroke-width="6" stroke-linecap="round"/>
+            <path d="M96 116c4-5 14-5 18 0" fill="none" stroke="#d7e4ef" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="pulse-line" aria-hidden="true"></div>
+        <div class="bottom-note"><span>AssemblyAI Voice Agents Challenge</span><span>Eufisky</span></div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>01</b> The problem</span>
+        <h2>The danger begins after “hello.”</h2>
+        <div class="problem-grid">
+          <div class="big-stat">
+            <strong>$2.4B</strong>
+            <p>in fraud losses reported by adults 60+ in 2024—four times the 2020 total.</p>
+          </div>
+          <blockquote class="story">
+            <p>Margaret answers an unfamiliar number. The caller says Medicare benefits will be suspended today. Blocking the number now is too late: the persuasive conversation has already started.</p>
+            <footer>Source: FTC, Protecting Older Consumers 2024–2025, December 2025. Reported losses; not Eufisky savings.</footer>
+          </blockquote>
+        </div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>02</b> Demo preview</span>
+        <h2>One sentence changes the call.</h2>
+        <div class="demo-frame" aria-label="Illustration of Eufisky live dashboard">
+          <div class="meter">
+            <span>Live risk</span>
+            <strong>74</strong>
+            <div class="meter-bar"><i></i></div>
+            <span class="signal">authority claim</span><span class="signal">urgent</span><span class="signal">PII request</span>
+          </div>
+          <div class="transcript">
+            <h3>Connected call</h3>
+            <div class="bubble">Caller: “Please read me the number on your Medicare card.”</div>
+            <div class="bubble senior">Margaret: “Let me get my purse.”</div>
+            <div class="guardian-strip">Caller paused · Guardian is speaking privately with Margaret</div>
+          </div>
+        </div>
+        <div class="bottom-note"><span>Live voice or type-to-talk</span><span>Replay is the microphone-free fallback</span></div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>03</b> How it works</span>
+        <h2>Listen separately. Decide transparently. Intervene privately.</h2>
+        <div class="flow">
+          <div class="flow-node voice">
+            <span class="step">1</span>
+            <h3>Two audio legs</h3>
+            <p>Caller and senior each get a Universal Streaming session.</p>
+            <div class="leg-lines"><span>Caller · “Medicare”</span><span>Margaret · “my card”</span></div>
+          </div>
+          <div class="flow-node risk">
+            <span class="step">2</span>
+            <h3>Explainable risk</h3>
+            <p>Speaker-specific phrases, decaying weights, combo bonuses, and fixed thresholds.</p>
+          </div>
+          <div class="flow-node guard">
+            <span class="step">3</span>
+            <h3>Private Guardian</h3>
+            <p>The caller is held. Margaret can resume, call Sarah, trust, or end.</p>
+          </div>
+        </div>
+        <div class="bottom-note"><span>Trusted contacts skip this path entirely</span><span>One FastAPI service · same-origin HTTPS/WSS</span></div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>04</b> AssemblyAI in Eufisky</span>
+        <h2>AssemblyAI integration</h2>
+        <table class="assembly-table">
+          <thead><tr><th>Capability</th><th>Where</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Voice Agent API</td><td>Front Door + Guardian</td><td>Front Door and Guardian; fallback paths available</td></tr>
+            <tr><td>Universal Streaming</td><td>One session per connected leg</td><td>Low-latency words with deterministic caller/senior labels</td></tr>
+            <tr><td>Keyterm prompting</td><td>Names + scam lexicon</td><td>Bias recognition toward relevant vocabulary</td></tr>
+            <tr><td>Batch PII redaction</td><td>After unknown calls</td><td>Safer transcript and redacted audio when available</td></tr>
+            <tr><td>LLM Gateway summary</td><td>LLM Gateway + template fallback</td><td>Plain-English, structured incident report for family</td></tr>
+          </tbody>
+        </table>
+        <div class="bottom-note"><span>Provider use follows the current AssemblyAI APIs</span><span>Failures preserve a deterministic fallback path</span></div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>05</b> Why it is original</span>
+        <h2>Private help during a concerning call</h2>
+        <div class="original-grid">
+          <ul class="not-list">
+            <li><s>Judge a call from caller ID alone</s></li>
+            <li><s>Ask an opaque model for a scam verdict</s></li>
+            <li><s>Record every family conversation</s></li>
+            <li><s>Take control away from the senior</s></li>
+          </ul>
+          <div class="original-core">
+            <p>Pause a concerning conversation, explain the evidence, and offer family help.</p>
+            <small>Explainable rules and private assistance. Consent controls need further hardening.</small>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>06</b> Business value</span>
+        <h2>Start with families; validate partner demand</h2>
+        <div class="value-grid">
+          <div class="buyers">
+            <div class="buyer"><b>Families</b><span>A calm safety layer without listening to ordinary calls</span></div>
+            <div class="buyer"><b>Telcos</b><span>An opt-in protection service beyond commodity blocking</span></div>
+            <div class="buyer"><b>Insurers + banks</b><span>Intervene before a payment or account disclosure</span></div>
+            <div class="buyer"><b>Senior living</b><span>Consistent escalation to staff and family</span></div>
+          </div>
+          <div class="value-copy">
+            <h3>Pricing hypothesis</h3>
+            <p>Explore a family subscription and partner pilots. Pricing awaits measured usage and operating costs.</p>
+            <p>Trusted calls bypass AI. Carrier charges and support costs still matter.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <span class="chapter"><b>07</b> Roadmap</span>
+        <h2>From browser proof to an everyday safety service.</h2>
+        <div class="roadmap">
+          <div class="milestone">
+            <span class="idx">01</span>
+            <h3>Real phone lines</h3>
+            <p>Twilio or carrier media streams, per-leg whispers, call attestation, consent, and durable encrypted storage.</p>
+          </div>
+          <div class="milestone">
+            <span class="idx">02</span>
+            <h3>Language coverage</h3>
+            <p>Spanish monitoring is optional today. Localized agent conversations and evaluation come next.</p>
+          </div>
+          <div class="milestone">
+            <span class="idx">03</span>
+            <h3>Family app</h3>
+            <p>Contacts, alerts, live conference invitations, and accessible incident review.</p>
+          </div>
+        </div>
+        <div class="bottom-note"><span>Production validation: false interventions, missed scams, latency, and cost</span><span>Privacy remains the product boundary</span></div>
+      </section>
+
+      <section><span class="chapter"><b>08</b> Evidence and limits</span><h2>Measured prototype, defined next steps</h2><div class="roadmap"><div class="milestone"><span class="idx">85</span><h3>Passing local tests</h3><p>Routing, hold isolation, rules, Replay, post-call processing, and browser contracts.</p></div><div class="milestone"><span class="idx">100</span><h3>Scripted scenarios</h3><p>60 scam scripts reached intervention; 40 benign scripts did not. Constructed text fixtures.</p></div><div class="milestone"><span class="idx">Next</span><h3>Real audio evaluation</h3><p>Consent hardening, privacy controls, accents, outages, and real phone integration.</p></div></div><div class="bottom-note"><span>Source: local pytest and tools/eval_risk.py · September 30, 2026</span><span>Scripted results do not establish real-world effectiveness</span></div></section><section class="dark">
+        <div class="team-grid">
+          <div>
+            <h2>Keep the familiar phone call. Add a steady voice.</h2>
+            <p class="team-name">Eufisky</p>
+            <p class="print-tip">Browser prototype · AssemblyAI Voice Agent Hackathon · September 2026</p>
+          </div>
+          <nav class="link-board" aria-label="Project links">
+            <a href="https://eufisky.onrender.com/?room=demo">Live demo<br><small>eufisky.onrender.com</small></a>
+            <a href="https://github.com/adib-cyber007/Eufisky">Public repository<br><small>github.com/adib-cyber007/Eufisky</small></a>
+            <a href="https://eufisky.onrender.com/dashboard?room=demo">Family dashboard<br><small>Replay the full intervention</small></a>
+          </nav>
+        </div>
+        <div class="bottom-note"><span>Built on AssemblyAI</span><span>Thank you</span></div>
+      </section>
+    </div>
+  </div>
+  
+  
+<div class="slide-counter"></div><script>
+const slides=[...document.querySelectorAll('.slides > section')];
+window.showSlide=function(n){window.slideIndex=Math.max(0,Math.min(slides.length-1,n));slides.forEach((s,i)=>s.classList.toggle('active',i===window.slideIndex));document.querySelector('.slide-counter').textContent=(window.slideIndex+1)+' / '+slides.length};showSlide(0);
+document.addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key))showSlide(window.slideIndex+1);if(['ArrowLeft','PageUp'].includes(e.key))showSlide(window.slideIndex-1)});
+</script></body>
+</html>

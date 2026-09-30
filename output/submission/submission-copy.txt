@@ -1,0 +1,55 @@
+Eufisky - copy-ready submission text
+
+PROJECT TITLE (42 characters)
+Eufisky: A Voice Guardian for Older Adults
+
+SHORT DESCRIPTION (207 characters; within the 255-character guide limit)
+Eufisky screens unfamiliar callers, detects scam pressure during a conversation, and pauses the caller for private guidance and family help. Built with AssemblyAI; demonstrated in a browser phone simulation.
+
+LONG DESCRIPTION (357 words)
+Phone scams often become dangerous during the conversation: an unfamiliar caller creates urgency, claims authority, and pressures someone to share personal information or make a payment. Eufisky explores how a voice agent can help an older adult at that moment while preserving their choice.
+
+The working prototype provides browser phones for a caller, an older adult named Margaret, and a family member named Sarah, alongside a family dashboard. Trusted contacts bypass AI processing. Unknown callers meet a Front Door agent that asks who is calling and why. Connected unknown calls use separate AssemblyAI Universal Streaming sessions for caller and senior audio, giving each transcript segment a known audio-leg identity.
+
+A deterministic risk engine combines speaker-specific phrases, time decay, and contextual bonuses. It produces visible evidence rather than a model-generated scam verdict. When intervention rules fire, the caller is held while Guardian offers private guidance. Registered tools support resuming, family conferencing, ending, and contact decisions. These controls remain a prototype and require further consent and safety hardening before real-world use.
+
+AssemblyAI is central to the implementation: the Voice Agent API supports Front Door and Guardian, Universal Streaming supplies live transcription with keyterm prompting, batch processing requests PII-redacted transcripts and audio, and LLM Gateway generates structured incident summaries. Provider failures can use Groq/Gemini or deterministic fallbacks, so replay and fallback demonstrations do not establish hosted-model performance.
+
+The dashboard shows transcripts, evidence, risk changes, and the intervention timeline. A built-in Replay makes the scripted story reproducible without microphone setup. The local suite passes 85 tests. Offline evaluation covers 60 scam scripts and 40 benign scripts; those constructed scenarios are not real-world effectiveness estimates.
+
+The initial customer hypothesis is an adult child supporting an older parent. Future pilots could explore senior-living and financial-service partnerships. Eufisky's product focus is private assistance, an understandable explanation, and a path to a trusted person during a concerning call.
+
+Today this is an English-first browser simulation, with optional Spanish monitoring; agent conversations remain English. Real telephony, authenticated households, stronger caller identity, complete privacy lifecycle controls, and representative audio evaluations are next. The public demo contains invented information and should not be used for real personal data.
+
+TECHNOLOGIES
+AssemblyAI Voice Agent API, AssemblyAI Universal Streaming, AssemblyAI LLM Gateway, Python, FastAPI, WebSockets, SQLite
+Optional fallback providers: Groq, Gemini. Select actual available tags in the form.
+Do not list Twilio as implemented.
+
+CATEGORIES
+Voice AI, Fraud prevention, Accessibility, Elder care
+
+PUBLIC REPOSITORY
+https://github.com/adib-cyber007/Eufisky
+
+DEMO PLATFORM
+Web application hosted on Render
+
+APPLICATION URL
+https://eufisky.onrender.com/?room=demo
+
+ADDITIONAL INFORMATION FOR JUDGES
+Start at the Family Dashboard, choose 4x Replay, and watch the risk evidence and private Guardian transition. Replay is a scripted event demonstration, not a live provider benchmark. The attached narrated MP4 also demonstrates the browser interface. Use invented information only. If the public free-tier service is asleep, allow it time to wake. The submission does not claim carrier integration, production-grade fraud prevention, or measured financial losses avoided.
+
+ASSETS
+Cover: Eufisky-cover.png
+Presentation: Eufisky-pitch-deck.pdf
+Video: Eufisky-demo.mp4
+Editable deck: Eufisky-pitch-deck.html
+Video narration: narration.txt
+Captions: Eufisky-demo.srt
+
+SOURCE OF REQUIREMENTS
+https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon
+https://lablab.ai/delivering-your-hackathon-solution
+Event-specific requirements take precedence. The shared guide currently contains an IBM Bob report reference; that is not listed in this AssemblyAI event's own requirements and is not represented as an AssemblyAI requirement here.

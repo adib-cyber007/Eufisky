@@ -1,0 +1,199 @@
+1
+00:00:00,000 --> 00:00:05,742
+Meet Eufisky, a voice guardian for older adults, built around Assembly AI.
+
+2
+00:00:05,742 --> 00:00:13,398
+The idea is simple: when an unfamiliar caller pressures someone, offer understandable help during the conversation.
+
+3
+00:00:13,398 --> 00:00:16,269
+This submission demonstrates our browser prototype.
+
+4
+00:00:16,269 --> 00:00:23,925
+The narrated recording includes a scripted Replay, and does not claim to measure live provider performance.
+
+5
+00:00:24,925 --> 00:00:25,866
+Consider Margaret.
+
+6
+00:00:25,866 --> 00:00:31,515
+A stranger calls claiming that her Medicare benefits will be suspended today.
+
+7
+00:00:31,515 --> 00:00:38,105
+The danger develops after she answers, through urgency, threats, and requests for personal information.
+
+8
+00:00:38,105 --> 00:00:47,519
+Eufisky explores a practical response: recognize those signals, explain the concern, and create a path to a trusted family member.
+
+9
+00:00:47,519 --> 00:00:54,579
+Our objective is support at the moment of pressure, while preserving the older adult's choice.
+
+10
+00:00:55,579 --> 00:00:57,812
+Trusted contacts bypass AI processing.
+
+11
+00:00:57,812 --> 00:01:04,510
+Unknown callers first meet a Front Door agent that asks who is calling and why.
+
+12
+00:01:04,510 --> 00:01:10,314
+Once connected, separate audio legs give caller and senior transcripts a known identity.
+
+13
+00:01:10,314 --> 00:01:15,226
+A deterministic risk engine combines phrases, time decay, and contextual bonuses.
+
+14
+00:01:15,226 --> 00:01:21,031
+When intervention rules fire, the caller is held while Guardian offers private guidance.
+
+15
+00:01:21,031 --> 00:01:27,282
+The dashboard exposes evidence and the timeline so the family can understand what happened.
+
+16
+00:01:28,282 --> 00:01:31,681
+Assembly AI is central to the implementation.
+
+17
+00:01:31,681 --> 00:01:36,537
+The Voice Agent API supports Front Door and Guardian conversations.
+
+18
+00:01:36,537 --> 00:01:42,849
+Universal Streaming transcribes each connected audio leg, with keyterm prompting for relevant vocabulary.
+
+19
+00:01:42,849 --> 00:01:52,074
+After an unknown call, batch processing requests redacted transcripts and audio, and LLM Gateway supports a structured incident summary.
+
+20
+00:01:52,074 --> 00:01:57,900
+Groq, Gemini, and deterministic fallback paths help the prototype handle provider failures.
+
+21
+00:01:57,900 --> 00:02:06,154
+These fallbacks are disclosed because a working Replay alone does not prove that every hosted integration ran.
+
+22
+00:02:07,154 --> 00:02:13,976
+Here is an actual recording of the local dashboard running Replay at twice normal speed.
+
+23
+00:02:13,976 --> 00:02:16,250
+The entire story is scripted.
+
+24
+00:02:16,250 --> 00:02:21,708
+The stranger claims authority, threatens lost benefits, and asks for account numbers.
+
+25
+00:02:21,708 --> 00:02:24,436
+Risk evidence accumulates alongside the conversation.
+
+26
+00:02:24,436 --> 00:02:32,623
+The timeline shows the intervention: the caller is paused, Guardian explains the concern, and Margaret asks for Sarah.
+
+27
+00:02:32,623 --> 00:02:38,535
+The scripted story then brings Sarah into the conversation and ends the call.
+
+28
+00:02:38,535 --> 00:02:41,718
+The dashboard preserves the sequence for review.
+
+29
+00:02:41,718 --> 00:02:50,814
+This demonstrates the interface and event flow; it is not a real telephone call or a live speech recognition benchmark.
+
+30
+00:02:51,814 --> 00:02:57,702
+The first customer hypothesis is an adult child supporting an older parent.
+
+31
+00:02:57,702 --> 00:03:04,081
+A family subscription could offer reassurance and a shared view of concerning calls.
+
+32
+00:03:04,081 --> 00:03:08,497
+Potential partners include senior living organizations and financial services.
+
+33
+00:03:08,497 --> 00:03:12,914
+These are hypotheses to validate through interviews and pilots.
+
+34
+00:03:12,914 --> 00:03:17,820
+Pricing requires measured usage, carrier charges, infrastructure, and support costs.
+
+35
+00:03:17,820 --> 00:03:22,727
+We have not demonstrated prevented financial losses or commercial demand.
+
+36
+00:03:23,727 --> 00:03:27,667
+Our local test suite passes eighty five tests.
+
+37
+00:03:27,667 --> 00:03:34,562
+An offline rules evaluation also covers sixty constructed scam scripts and forty benign scripts.
+
+38
+00:03:34,562 --> 00:03:39,980
+All scam fixtures reached intervention, while the benign fixtures did not.
+
+39
+00:03:39,980 --> 00:03:47,368
+These results check expected behavior on our examples; they do not establish real world accuracy.
+
+40
+00:03:47,368 --> 00:03:54,263
+Public smoke checks passed for health, pages, dashboard connectivity, and the Replay event story.
+
+41
+00:03:54,263 --> 00:03:59,680
+The next evaluation must include representative audio, accents, interruptions, and outages.
+
+42
+00:04:00,680 --> 00:04:06,755
+Today Eufisky is an English first browser simulation, with optional Spanish monitoring.
+
+43
+00:04:06,755 --> 00:04:12,324
+Real phone integration through Twilio or another carrier is future work.
+
+44
+00:04:12,324 --> 00:04:21,436
+Before real world use, priorities include consent hardening, authenticated households, stronger caller identity, and complete privacy lifecycle controls.
+
+45
+00:04:21,436 --> 00:04:26,499
+We also need to measure false interventions and recovery behavior.
+
+46
+00:04:26,499 --> 00:04:32,574
+Those steps turn a promising demonstration into evidence for a responsible pilot.
+
+47
+00:04:33,574 --> 00:04:40,547
+Eufisky's focus is private assistance, understandable evidence, and a trusted person when a conversation becomes concerning.
+
+48
+00:04:40,547 --> 00:04:47,520
+The public browser demo and source repository are linked in this deck and the submission copy.
+
+49
+00:04:47,520 --> 00:04:51,442
+Try Replay to inspect the story without microphone setup.
+
+50
+00:04:51,442 --> 00:04:55,364
+Thank you for reviewing Eufisky, built with Assembly AI.

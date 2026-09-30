@@ -1,0 +1,26 @@
+{
+  "title": "Eufisky: A Voice Guardian for Older Adults",
+  "short_description": "Eufisky screens unfamiliar callers, detects scam pressure during a conversation, and pauses the caller for private guidance and family help. Built with AssemblyAI; demonstrated in a browser phone simulation.",
+  "long_description": "Phone scams often become dangerous during the conversation: an unfamiliar caller creates urgency, claims authority, and pressures someone to share personal information or make a payment. Eufisky explores how a voice agent can help an older adult at that moment while preserving their choice.\n\nThe working prototype provides browser phones for a caller, an older adult named Margaret, and a family member named Sarah, alongside a family dashboard. Trusted contacts bypass AI processing. Unknown callers meet a Front Door agent that asks who is calling and why. Connected unknown calls use separate AssemblyAI Universal Streaming sessions for caller and senior audio, giving each transcript segment a known audio-leg identity.\n\nA deterministic risk engine combines speaker-specific phrases, time decay, and contextual bonuses. It produces visible evidence rather than a model-generated scam verdict. When intervention rules fire, the caller is held while Guardian offers private guidance. Registered tools support resuming, family conferencing, ending, and contact decisions. These controls remain a prototype and require further consent and safety hardening before real-world use.\n\nAssemblyAI is central to the implementation: the Voice Agent API supports Front Door and Guardian, Universal Streaming supplies live transcription with keyterm prompting, batch processing requests PII-redacted transcripts and audio, and LLM Gateway generates structured incident summaries. Provider failures can use Groq/Gemini or deterministic fallbacks, so replay and fallback demonstrations do not establish hosted-model performance.\n\nThe dashboard shows transcripts, evidence, risk changes, and the intervention timeline. A built-in Replay makes the scripted story reproducible without microphone setup. The local suite passes 85 tests. Offline evaluation covers 60 scam scripts and 40 benign scripts; those constructed scenarios are not real-world effectiveness estimates.\n\nThe initial customer hypothesis is an adult child supporting an older parent. Future pilots could explore senior-living and financial-service partnerships. Eufisky's product focus is private assistance, an understandable explanation, and a path to a trusted person during a concerning call.\n\nToday this is an English-first browser simulation, with optional Spanish monitoring; agent conversations remain English. Real telephony, authenticated households, stronger caller identity, complete privacy lifecycle controls, and representative audio evaluations are next. The public demo contains invented information and should not be used for real personal data.",
+  "technologies": [
+    "AssemblyAI Voice Agent API",
+    "AssemblyAI Universal Streaming",
+    "AssemblyAI LLM Gateway",
+    "Python",
+    "FastAPI",
+    "WebSockets",
+    "SQLite"
+  ],
+  "categories": [
+    "Voice AI",
+    "Fraud prevention",
+    "Accessibility",
+    "Elder care"
+  ],
+  "repository": "https://github.com/adib-cyber007/Eufisky",
+  "demo_platform": "Web application hosted on Render",
+  "application_url": "https://eufisky.onrender.com/?room=demo",
+  "cover_file": "Eufisky-cover.png",
+  "video_file": "Eufisky-demo.mp4",
+  "slides_file": "Eufisky-pitch-deck.pdf"
+}
