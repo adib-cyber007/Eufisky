@@ -19,7 +19,20 @@ equivalent `{"text":{"text":"hello"}}`; the server normalizes both forms.
 The `registered` acknowledgement is the authoritative active room shown by each
 browser page. `agent_say` uses browser speech only when `playback` is `speech`;
 binary PCM is the returned Voice Agent audio path. `agent_output_reset` cancels
-both paths before an agent handoff or deterministic closing line.
+both paths before an agent handoff, deterministic closing line, or a confirmed
+Voice Agent interruption (`reply.done` with `status: interrupted`). Completed
+replies do not reset playback; their buffered audio plays to the end.
+
+Browser capture preserves resampling state across worklet blocks and sends a
+continuous 16 kHz stream. PCM playback uses browser echo cancellation, allowing
+both people to speak at once. During system speech fallback, the browser sends
+silence rather than removing time from the microphone stream. PCM playback has
+an 80 ms initial buffer and schedules subsequent chunks contiguously.
+
+Closing `agent_say` messages include `utterance_id`. The receiving phone sends
+`playback_done{utterance_id}` only after speech finishes. The server then ends
+the call; a bounded timeout covers older clients or unavailable system speech.
+Manual hangup remains immediate.
 
 For microphone calls, conversational agent input also has exactly one path. In
 `voice_agent` mode, live PCM is sent to the Voice Agent while the separate STT
@@ -28,6 +41,14 @@ scoring. Its finalized `TurnEndEvent` must not be sent back to that same agent
 as text. In LLM/fallback mode there is no live agent-audio input, so the STT
 turn text supplies the conversational input instead. Typed browser input always
 uses the text path.
+
+STT and Voice Agent transcription use `max_accuracy`. Voice Agent silence
+windows remain unset to preserve adaptive pacing and waiting for complete
+names/numbers. Only finalized STT words enter the transcript/risk engine;
+provisional replacements and repeated formatted turns aren't appended twice.
+Transcript-only final turns are supported. A live Voice Agent socket drop
+switches to STT plus the text backend, preserves conversation context, and
+asks the person to repeat the last sentence rather than leaving a silent call.
 
 ## Trusted call
 

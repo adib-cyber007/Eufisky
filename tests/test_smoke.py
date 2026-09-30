@@ -109,7 +109,7 @@ def test_phone_audio_cancels_other_output_before_speech_and_tears_down() -> None
         Path(__file__).resolve().parents[1] / "app" / "web" / "static" / "js" / "phone.js"
     ).read_text(encoding="utf-8")
     speak_body = audio_script.split("speak(text) {", 1)[1].split("async chime()", 1)[0]
-    assert speak_body.index("this.stopPcm()") < speak_body.index("window.speechSynthesis.cancel()")
-    assert speak_body.index("window.speechSynthesis.cancel()") < speak_body.index("window.speechSynthesis.speak(utterance)")
+    assert speak_body.index("this.stopPcm()") < speak_body.index("this.cancelSpeech()")
+    assert speak_body.index("this.cancelSpeech()") < speak_body.index("window.speechSynthesis.speak(utterance)")
     assert "audio.destroy()" in phone_script
     assert 'socket.close(1000, "page closed")' in phone_script

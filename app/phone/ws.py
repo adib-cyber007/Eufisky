@@ -131,6 +131,8 @@ async def phone_socket(websocket: WebSocket) -> None:
                     await calls.guardian_action(room_name, role, {"1": "end", "2": "family", "3": "continue"}[digit])
             elif message_type == "guardian_action":
                 await calls.guardian_action(room_name, role, str(payload.get("action") or ""))
+            elif message_type == "playback_done":
+                calls.playback_done(room_name, role, str(payload.get("utterance_id") or ""))
             elif message_type in {"mic", "pong", "ping"}:
                 continue
             else:

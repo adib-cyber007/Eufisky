@@ -130,6 +130,8 @@ class FrontDoorSession:
                     })
                 elif event_type == "audio":
                     await self.call.room.send_audio("caller", bytes(event.get("data") or b""))
+                elif event_type == "output_reset":
+                    await self.call.room.send_phone("caller", {"type": "agent_output_reset"})
                 elif event_type == "tool_call" and not self.tool_called:
                     self.tool_called = True
                     await self.on_tool(event, self.score)

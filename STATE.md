@@ -78,3 +78,24 @@ OFF.
 
 None. Real telephony is intentionally roadmap-only until the owner confirms a
 working Twilio trial number and verified destinations.
+
+## Voice reliability update — 2026-09-30
+
+Fixed fractional sample loss in browser resampling, microphone muting during
+PCM playback, per-chunk playback gaps, stale audio after confirmed interruption,
+and automatic hangup cutting off system speech. Closing lines now wait for the
+correct phone's playback acknowledgement, with a bounded timeout. Voice Agent
+uses accuracy mode with adaptive pacing, recognition context and Guardian names;
+runtime disconnects switch to the existing STT/text fallback. STT only commits
+finalized words, accepts transcript-only turns and ignores duplicate turn ends.
+Keyterms are balanced across benign, senior and scam vocabulary within the cap.
+
+Checks: 88 Python tests and 4 dependency-free Node audio checks pass; JavaScript
+syntax and diff whitespace checks pass. A public synthetic-voice baseline
+reproduced "pharmacy delivery" being transcribed as "farm delivery" and routed
+the call successfully. The same audio will be checked after deployment. No new
+dependency or feature flag is required. Local AssemblyAI credentials are absent;
+provider integration checks use the hosted service in isolated test rooms.
+
+Checkpoint: commit/push this coherent voice fix to origin/main (already
+authorized), then verify the deployed assets, speech recognition and call closure.

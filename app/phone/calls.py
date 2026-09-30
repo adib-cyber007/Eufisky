@@ -83,6 +83,10 @@ class CallSession:
         self.claimed_org = ""
         self.notice_sent = False
         self.dial_timeout: asyncio.Task[None] | None = None
+        self.closing_task: asyncio.Task[None] | None = None
+        self.playback_id = ""
+        self.playback_role = ""
+        self.playback_finished = asyncio.Event()
         if self.monitored:
             for leg in ("caller", "senior"):
                 path = RECORDINGS_DIR / f"{self.id}_{leg}.wav"
@@ -291,12 +295,36 @@ class CallController:
         # from the Voice Agent session.
         await self._close_frontdoor(call)
         await call.room.send_phone("caller", {"type": "agent_output_reset"})
-        await call.room.send_phone("caller", {
-            "type": "agent_say", "text": decision.result["say"], "agent": "front_door",
-            "playback": "speech",
+        await self._say_and_end(call, "caller", decision.result["say"], "front_door", decision.action)
+
+    async def _say_and_end(self, call: CallSession, role: str, text: str, agent: str, reason: str) -> None:
+        call.playback_id = uuid.uuid4().hex
+        call.playback_role = role
+        call.playback_finished.clear()
+        await call.room.send_phone(role, {
+            "type": "agent_say", "text": text, "agent": agent,
+            "playback": "speech", "utterance_id": call.playback_id,
         })
-        await asyncio.sleep(self.closing_delay)
-        await self.hangup(call.room.room, decision.action)
+        if not self.closing_delay:
+            await self.hangup(call.room.room, reason)
+            return
+        # Run separately so this phone's receive loop can read the playback
+        # acknowledgement, including when a Guardian button initiated closure.
+        async def finish() -> None:
+            timeout = max(self.closing_delay, len(text.split()) / 1.8 + 3)
+            try:
+                await asyncio.wait_for(call.playback_finished.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                pass  # Older clients or unavailable system speech still end.
+            if call.room.current_call is call and call.state != CallState.ENDED:
+                await self.hangup(call.room.room, reason)
+
+        call.closing_task = asyncio.create_task(finish(), name=f"closing-{call.id}")
+
+    def playback_done(self, room_name: str, role: str, utterance_id: str) -> None:
+        call = self.registry.get(room_name).current_call
+        if call and call.playback_id and role == call.playback_role and utterance_id == call.playback_id:
+            call.playback_finished.set()
 
     async def _screening_notice(
         self, call: CallSession, outcome: str, args: dict[str, Any]
@@ -332,14 +360,10 @@ class CallController:
                 callback_number=call.caller_phone,
             )
             db.update_call(call.id, front_door_outcome="take_message_no_answer")
-            await call.room.send_phone("caller", {
-                "type": "agent_say",
-                "text": "She couldn't answer, so I'll pass along your message. Goodbye.",
-                "agent": "front_door",
-                "playback": "speech",
-            })
-            await asyncio.sleep(2)
-            await self.hangup(call.room.room, "senior did not answer")
+            await self._say_and_end(
+                call, "caller", "She couldn't answer, so I'll pass along your message. Goodbye.",
+                "front_door", "senior did not answer",
+            )
         except asyncio.CancelledError:
             raise
 
@@ -489,10 +513,11 @@ class CallController:
             "end_call": "You're safe. I have ended the call.",
         }[name]
         await call.room.send_phone("senior", {"type": "agent_output_reset"})
-        await call.room.send_phone("senior", {
-            "type": "agent_say", "text": reassurance, "agent": "guardian",
-            "playback": "speech",
-        })
+        if name != "end_call":
+            await call.room.send_phone("senior", {
+                "type": "agent_say", "text": reassurance, "agent": "guardian",
+                "playback": "speech",
+            })
         call.state = CallState(call.monitor.machine.state.value)
         await self._send_state(call)
         await call.room.broadcast_dashboard({
@@ -511,9 +536,7 @@ class CallController:
             call.state = CallState.FAMILY_CONF
             await self._send_state(call)
         elif name == "end_call":
-            if self.closing_delay:
-                await asyncio.sleep(self.closing_delay)
-            await self.hangup(call.room.room, "Guardian ended the call")
+            await self._say_and_end(call, "senior", reassurance, "guardian", "Guardian ended the call")
 
     async def guardian_action(self, room_name: str, role: str, action: str) -> bool:
         call = self.registry.get(room_name).current_call
@@ -535,6 +558,8 @@ class CallController:
         call: CallSession | None = live.current_call
         if not call or call.state == CallState.ENDED:
             return
+        if call.closing_task and call.closing_task is not asyncio.current_task() and not call.closing_task.done():
+            call.closing_task.cancel()
         if call.dial_timeout and call.dial_timeout is not asyncio.current_task() and not call.dial_timeout.done():
             call.dial_timeout.cancel()
         await self._close_frontdoor(call)

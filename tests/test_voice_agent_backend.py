@@ -1,6 +1,7 @@
 """Voice Agent startup always reaches its fallback by the deadline."""
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -27,9 +28,54 @@ class Fallback:
                 yield {}
 
 
-def test_voice_turn_waits_through_a_natural_caller_pause() -> None:
-    assert voice_module.TURN_MIN_SILENCE_MS >= 1000
-    assert voice_module.TURN_MAX_SILENCE_MS > voice_module.TURN_MIN_SILENCE_MS
+@pytest.mark.asyncio
+async def test_voice_config_preserves_adaptive_waiting_and_flushes_real_interruptions(monkeypatch) -> None:
+    class Socket:
+        def __init__(self): self.sent = []
+        async def send(self, message): self.sent.append(json.loads(message))
+        async def __aiter__(self):
+            yield json.dumps({"type": "session.ready"})
+            yield json.dumps({"type": "reply.done", "status": "completed"})
+            yield json.dumps({"type": "reply.done", "status": "interrupted"})
+
+    socket = Socket()
+    async def connect(*args, **kwargs): return socket
+    monkeypatch.setattr(voice_module, "connect", connect)
+    backend = VoiceAgentBackend(fallback=Fallback())
+    backend.closed = True  # finite fake socket isn't an unexpected network drop
+    await backend._start_voice("prompt", [], {"keyterms": ["Sarah"]})
+    await backend.reader
+    config = socket.sent[0]["session"]["input"]
+    assert config["transcription_mode"] == "max_accuracy"
+    assert config["keyterms"] == ["Sarah"]
+    assert "min_silence" not in config.get("turn_detection", {})
+    assert "max_silence" not in config.get("turn_detection", {})
+    assert backend.queue.get_nowait() == {"type": "output_reset"}
+    assert backend.queue.empty()  # a completed reply never clears queued audio
+
+
+@pytest.mark.asyncio
+async def test_live_socket_drop_switches_to_fallback_without_ending_the_call() -> None:
+    from app.agent.llm_backend import LLMBackend
+
+    class DroppedSocket:
+        async def __aiter__(self):
+            yield json.dumps({"type": "transcript.user", "text": "My name is Pat."})
+            raise ConnectionError("simulated network drop")
+        async def close(self): pass
+
+    fallback = LLMBackend(groq_key="", gemini_key="")
+    backend = VoiceAgentBackend(fallback=fallback)
+    backend.ready.set()
+    backend.socket = DroppedSocket()
+    await backend._read()
+    assert backend.using_fallback
+    assert backend.provider != "voice_agent"
+    assert {"role": "user", "content": "My name is Pat."} in fallback.messages
+    assert backend.queue.get_nowait() == {"type": "output_reset"}
+    event = await asyncio.wait_for(backend.queue.get(), timeout=1)
+    assert event["type"] == "say" and "repeat" in event["text"]
+    await backend.close()
 
 
 class DecisionOnlyBackup:

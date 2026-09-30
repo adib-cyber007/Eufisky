@@ -127,6 +127,8 @@
       if (message.playback !== "audio") {
         audio.speak(message.text, {
           confidenceFriendly: guardianVoiceTuning && message.agent === "guardian",
+        }).then((completed) => {
+          if (completed && message.utterance_id) send("playback_done", { utterance_id: message.utterance_id });
         });
       }
     }
@@ -191,7 +193,7 @@
     event.preventDefault();
     const input = $("#text-talk");
     if (input.value.trim()) {
-      window.speechSynthesis.cancel();
+      audio.resetOutput();
       send("text", { text: input.value.trim() }); input.value = "";
     }
   });

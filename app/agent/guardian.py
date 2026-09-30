@@ -36,7 +36,10 @@ class GuardianSession:
         try:
             if os.getenv("SIMULATE_AGENT_FAIL", "").strip() == "1":
                 raise RuntimeError("simulated Guardian backend failure")
-            await asyncio.wait_for(self.backend.start(instructions(self.context), TOOLS, {**self.context, "agent_role": "guardian", "greeting": self.greeting}), timeout=3.0)
+            await asyncio.wait_for(self.backend.start(instructions(self.context), TOOLS, {
+                **self.context, "agent_role": "guardian", "greeting": self.greeting,
+                "keyterms": [self.context["senior_name"], self.context["family_name"], self.context["caller_name"]],
+            }), timeout=3.0)
             self.task = asyncio.create_task(self._consume(), name=f"guardian-{self.call.id}")
         except Exception:
             self.fallback = True
@@ -67,6 +70,8 @@ class GuardianSession:
                     await self.call.room.send_phone("senior", {"type": "agent_caption", "text": str(event.get("text") or ""), "agent": "guardian"})
                 elif kind == "audio":
                     await self.call.room.send_audio("senior", bytes(event.get("data") or b""))
+                elif kind == "output_reset":
+                    await self.call.room.send_phone("senior", {"type": "agent_output_reset"})
                 elif kind == "tool_call" and not self.tool_called:
                     self.tool_called = True
                     await self.on_tool(event)

@@ -35,6 +35,8 @@ def test_lexicon_has_required_shape_and_safe_keyterms() -> None:
     assert len(terms) <= 100
     assert all(len(term.split()) <= 3 and len(term) <= 50 for term in terms)
     assert terms[:4] == ["Medicare", "Social Security", "Margaret", "Sarah"]
+    assert "pharmacy pickup" in terms and "appointment reminder" in terms
+    assert "gift card" in terms and "medicare number" in terms
 
 
 def test_generic_bank_card_request_and_digit_disclosure_cross_l2() -> None:

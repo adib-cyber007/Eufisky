@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import chain, zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -26,24 +27,25 @@ def streaming_keyterms(
     org_names: list[str] | None = None,
     people_names: list[str] | None = None,
 ) -> list[str]:
-    """Prioritize names, then lexicon phrases of at most three words."""
+    """Prioritize names, then balance phrases across all signal families."""
 
     terms: list[str] = []
     seen: set[str] = set()
-    sources = [org_names or [], people_names or []]
-    sources.extend(
+    groups = [
         signal.get("phrases", [])
         for signal in lexicon.get("signals", {}).values()
         if isinstance(signal, dict)
-    )
-    for source in sources:
-        for raw in source:
-            term = str(raw).strip()
-            key = term.casefold()
-            if not term or len(term.split()) > 3 or len(term) > 50 or key in seen:
-                continue
-            seen.add(key)
-            terms.append(term)
-            if len(terms) == KEYTERM_LIMIT:
-                return terms
+    ]
+    # Round-robin avoids filling the provider's cap with the first few scam
+    # categories and excluding benign pharmacy/delivery and senior speech.
+    phrases = (term for row in zip_longest(*groups) for term in row if term is not None)
+    for raw in chain(org_names or [], people_names or [], phrases):
+        term = str(raw).strip()
+        key = term.casefold()
+        if not term or len(term.split()) > 3 or len(term) > 50 or key in seen:
+            continue
+        seen.add(key)
+        terms.append(term)
+        if len(terms) == KEYTERM_LIMIT:
+            return terms
     return terms

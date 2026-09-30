@@ -125,12 +125,21 @@ Add an AssemblyAI API key to `.env`; never commit that file. Then open
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
+node --test tests/audio.test.cjs
 .\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com
 ```
 
-The checked-in release passes 84 tests. The public smoke tool verifies health,
+The checked-in release passes 88 Python tests and 4 browser-audio logic checks.
+The public smoke tool verifies health,
 SQLite access, every page, secure dashboard WebSockets, Replay events, and
 completion.
+
+Microphone capture preserves fractional samples across 44.1/48 kHz audio
+blocks. PCM conversations support speaking and listening at the same time
+with browser echo cancellation and a small playback buffer. AssemblyAI uses
+accuracy mode with adaptive Voice Agent pacing; provisional STT words are
+committed only once finalized. Goodbyes finish before automatic hangup, and
+a dropped Voice Agent connection falls back to STT plus the text backend.
 
 ## Submission kit
 

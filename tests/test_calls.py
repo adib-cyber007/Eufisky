@@ -118,6 +118,25 @@ async def screen_and_answer(controller: CallController):
 
 
 @pytest.mark.asyncio
+async def test_closing_line_waits_for_the_correct_phones_playback(call_setup) -> None:
+    controller, sockets = call_setup
+    call = await controller.dial("demo", "+15550199321")
+    await controller._close_frontdoor(call)
+    controller.closing_delay = 1.5
+    await controller._say_and_end(call, "caller", "Thank you. I'll pass along your message. Goodbye.", "front_door", "message_saved")
+    message = sockets["caller"].json[-1]
+    await asyncio.sleep(0)
+    assert call.state != CallState.ENDED
+    controller.playback_done("demo", "senior", message["utterance_id"])
+    assert not call.playback_finished.is_set()
+    controller.playback_done("demo", "caller", "old-utterance")
+    assert not call.playback_finished.is_set()
+    controller.playback_done("demo", "caller", message["utterance_id"])
+    await asyncio.wait_for(call.closing_task, timeout=1)
+    assert call.state == CallState.ENDED
+
+
+@pytest.mark.asyncio
 async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> None:
     controller, sockets = call_setup
     call = await controller.dial("demo", "+15550199321")

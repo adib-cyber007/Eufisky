@@ -61,15 +61,23 @@ class STTStream:
         self._replay: deque[bytes] = deque(maxlen=20)
         self._runner: asyncio.Task[None] | None = None
         self._closed = False
+        self._audio_ms = 0.0
         self._word_counts: dict[int, int] = {}
+        self._ended_turns: set[int] = set()
         self.reconnects = 0
 
     @property
     def url(self) -> str:
         params = {
             "sample_rate": str(self.sample_rate),
+            "encoding": "pcm_s16le",
             "speech_model": MODEL,
-            "format_turns": "true",
+            "mode": "max_accuracy",
+            "prompt": (
+                "A telephone conversation about family, appointments, pharmacy pickups, "
+                "deliveries, benefits or account requests. Speakers may pause, spell names, "
+                "and read numbers. Transcribe only the words actually spoken."
+            ),
             "keyterms_prompt": json.dumps(self.keyterms),
         }
         if self.language == "es":
@@ -92,6 +100,7 @@ class STTStream:
         if self._runner is None:
             await self.start()
         frame = bytes(pcm)
+        self._audio_ms += len(frame) * 1000 / (2 * self.sample_rate)
         self._replay.append(frame)
         await self._audio.put(frame)
 
@@ -131,6 +140,7 @@ class STTStream:
                     self.reconnects += 1
                     replay = list(self._replay)
                     self._word_counts.clear()
+                    self._ended_turns.clear()
                     LOGGER.warning("STT %s reconnecting once after drop", self.speaker)
         finally:
             await self._events.put(_END)
@@ -189,17 +199,28 @@ class STTStream:
 
     async def _parse_turn(self, message: dict) -> None:
         turn = int(message.get("turn_order", 0))
+        if turn in self._ended_turns:
+            return
         words = message.get("words") or []
         seen = self._word_counts.get(turn, 0)
+        ended = bool(message.get("end_of_turn"))
+        text = str(message.get("transcript") or "").strip()
+        # Pro models may send transcript-only turns. Never lose those words.
+        if ended and not words:
+            words = [{"text": token, "end": int(self._audio_ms)} for token in text.split()]
         for word in words[seen:]:
-            text = str(word.get("text") or word.get("word") or "").strip()
-            if not text:
+            # A provisional word can be replaced at the same index. Advance
+            # only through the committed prefix so corrections aren't skipped.
+            if not ended and not word.get("word_is_final", False):
+                break
+            seen += 1
+            token = str(word.get("text") or word.get("word") or "").strip()
+            if not token:
                 continue
             t_ms = int(word.get("end") or word.get("end_ms") or 0)
-            final = bool(word.get("word_is_final", message.get("end_of_turn", False)))
-            await self._events.put(WordEvent(self.speaker, text, t_ms, final))
-        self._word_counts[turn] = len(words)
-        if message.get("end_of_turn"):
-            text = str(message.get("transcript") or "").strip()
+            await self._events.put(WordEvent(self.speaker, token, t_ms, True))
+        self._word_counts[turn] = seen
+        if ended:
+            self._ended_turns.add(turn)
             t_ms = int(words[-1].get("end") or words[-1].get("end_ms") or 0) if words else 0
             await self._events.put(TurnEndEvent(self.speaker, t_ms, text))

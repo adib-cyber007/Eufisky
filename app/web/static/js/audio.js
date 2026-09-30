@@ -14,6 +14,10 @@
       this.playAt = 0;
       this.playSources = new Set();
       this.holdTimer = null;
+      this.resampleWeight = 0;
+      this.resampleSum = 0;
+      this.speechDone = null;
+      this.outputGeneration = 0;
     }
 
     async ensureContext() {
@@ -25,16 +29,23 @@
     downsample(input, sourceRate) {
       if (sourceRate === TARGET_RATE) return input;
       const ratio = sourceRate / TARGET_RATE;
-      const length = Math.floor(input.length / ratio);
-      const output = new Float32Array(length);
-      for (let i = 0; i < length; i += 1) {
-        const start = Math.floor(i * ratio);
-        const end = Math.max(start + 1, Math.floor((i + 1) * ratio));
-        let sum = 0;
-        for (let j = start; j < end && j < input.length; j += 1) sum += input[j];
-        output[i] = sum / (end - start);
+      const output = [];
+      // Keep fractional samples across worklet blocks. Rounding each 128-sample
+      // block separately loses audio and changes the speech timing/pitch.
+      for (const sample of input) {
+        let remaining = 1;
+        while (remaining > 1e-9) {
+          const weight = Math.min(remaining, ratio - this.resampleWeight);
+          this.resampleSum += sample * weight;
+          this.resampleWeight += weight;
+          remaining -= weight;
+          if (this.resampleWeight >= ratio - 1e-9) {
+            output.push(this.resampleSum / ratio);
+            this.resampleWeight = this.resampleSum = 0;
+          }
+        }
       }
-      return output;
+      return new Float32Array(output);
     }
 
     consume(floatSamples, sourceRate) {
@@ -43,12 +54,11 @@
       for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
       this.onLevel(Math.min(1, peak * 2.5));
 
-      // Do not feed Eufisky's own speaker output back into STT. The old
-      // peak-based barge-in cancelled speech synthesis as soon as the mic
-      // heard the agent, making voice replies appear as captions but sound
-      // silent. Capture resumes automatically when playback finishes.
-      const pcmOutputPlaying = this.context && this.context.currentTime < this.playAt;
-      if (window.speechSynthesis.speaking || pcmOutputPlaying) return;
+      // Web Audio playback uses the microphone's echo cancellation, so keep
+      // capturing during PCM replies and human conversation (full duplex).
+      // System speech isn't part of that echo reference. Send silence during
+      // this fallback, preserving the STT clock instead of dropping frames.
+      if (window.speechSynthesis.speaking) samples.fill(0);
 
       this.pending.push(...samples);
       while (this.pending.length >= FRAME_SAMPLES) {
@@ -92,12 +102,15 @@
       if (this.stream) this.stream.getTracks().forEach((track) => track.stop());
       this.stream = this.source = this.processor = null;
       this.pending = [];
+      this.resampleWeight = this.resampleSum = 0;
       this.onLevel(0);
     }
 
     async play(arrayBuffer) {
-      window.speechSynthesis.cancel();
+      const generation = this.outputGeneration;
       const context = await this.ensureContext();
+      if (generation !== this.outputGeneration) return;
+      this.cancelSpeech();
       const pcm = new Int16Array(arrayBuffer);
       const audio = context.createBuffer(1, pcm.length, TARGET_RATE);
       const channel = audio.getChannelData(0);
@@ -108,12 +121,15 @@
       source.buffer = audio;
       source.connect(context.destination);
       const now = context.currentTime;
-      this.playAt = Math.max(now + 0.015, this.playAt);
+      // Buffer 80 ms only on an empty queue. Adding a safety gap to every
+      // chunk inserts audible breaks when packets arrive around playback time.
+      if (this.playAt <= now) this.playAt = now + 0.08;
       source.start(this.playAt);
       this.playAt += audio.duration;
     }
 
     stopPcm() {
+      this.outputGeneration += 1;
       this.playSources.forEach((source) => {
         try { source.stop(); } catch (_) { /* already stopped */ }
       });
@@ -122,8 +138,13 @@
     }
 
     resetOutput() {
-      window.speechSynthesis.cancel();
+      this.cancelSpeech();
       this.stopPcm();
+    }
+
+    cancelSpeech() {
+      if (this.speechDone) this.speechDone(false);
+      window.speechSynthesis.cancel();
     }
 
     preferredGuardianVoice() {
@@ -142,7 +163,7 @@
     speak(text) {
       const options = arguments[1] || {};
       this.stopPcm();
-      window.speechSynthesis.cancel();
+      this.cancelSpeech();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = options.confidenceFriendly ? 0.82 : 0.93;
       utterance.pitch = 1;
@@ -150,7 +171,17 @@
         const voice = this.preferredGuardianVoice();
         if (voice) utterance.voice = voice;
       }
-      window.speechSynthesis.speak(utterance);
+      return new Promise((resolve) => {
+        const finish = (completed) => {
+          if (this.speechDone !== finish) return;
+          this.speechDone = null;
+          resolve(completed);
+        };
+        this.speechDone = finish;
+        utterance.onend = () => finish(true);
+        utterance.onerror = () => finish(false);
+        window.speechSynthesis.speak(utterance);
+      });
     }
 
     destroy() {

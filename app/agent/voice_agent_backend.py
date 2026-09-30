@@ -6,6 +6,7 @@ import asyncio
 import audioop
 import base64
 import json
+import logging
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import Any
@@ -16,10 +17,9 @@ from app.agent.llm_backend import LLMBackend
 from app.config import settings
 
 URL = "wss://agents.assemblyai.com/v1/ws"
+LOGGER = logging.getLogger(__name__)
 START_TIMEOUT = 3.0
 WATCHDOG_DELAY = 5.0
-TURN_MIN_SILENCE_MS = 1200
-TURN_MAX_SILENCE_MS = 2500
 _END = object()
 
 
@@ -45,6 +45,7 @@ class VoiceAgentBackend:
         self._text_history: list[str] = []
         self._fallback_pump: asyncio.Task[None] | None = None
         self._startup_error: Exception | None = None
+        self._voice_messages: list[dict[str, str]] = []
 
     @property
     def provider(self) -> str:
@@ -93,12 +94,15 @@ class VoiceAgentBackend:
                     "input": {
                         "format": {"encoding": "audio/pcm"},
                         "keyterms": context.get("keyterms", []),
-                        # Give older callers room for a natural pause without
-                        # treating it as permission to talk over them.
-                        "turn_detection": {
-                            "min_silence": TURN_MIN_SILENCE_MS,
-                            "max_silence": TURN_MAX_SILENCE_MS,
-                        },
+                        # Keep adaptive pacing and entity-aware waiting. Fixed
+                        # silence windows disable both in the Voice Agent API.
+                        "transcription_mode": "max_accuracy",
+                        "transcription_prompt": (
+                            "A phone conversation with Eufisky, a call-screening assistant. "
+                            "Callers give names, organizations and reasons for calling. "
+                            "The senior may ask to end the call, continue, or bring in family. "
+                            "Transcribe what is actually spoken, including hesitations and numbers."
+                        ),
                     },
                     "output": {"voice": "alba", "format": {"encoding": "audio/pcm"}},
                     "tools": voice_tools,
@@ -108,9 +112,17 @@ class VoiceAgentBackend:
         if self._startup_error is not None:
             raise self._startup_error
 
-    async def _start_fallback(self) -> None:
+    async def _start_fallback(self, *, resuming: bool = False) -> None:
+        if self.using_fallback or self.closed:
+            return
         self.using_fallback = True
-        await self.fallback.start(self._instructions, self._tools, self._context)
+        context = self._context
+        if resuming:
+            await self.queue.put({"type": "output_reset"})
+            context = {**context, "greeting": "The connection briefly dropped. Please repeat your last sentence."}
+        await self.fallback.start(self._instructions, self._tools, context)
+        if resuming and hasattr(self.fallback, "messages"):
+            self.fallback.messages[1:1] = self._voice_messages
         self._fallback_pump = asyncio.create_task(
             self._pump_fallback(), name="voice-agent-fallback-pump"
         )
@@ -138,7 +150,12 @@ class VoiceAgentBackend:
                 elif event_type.startswith("transcript.agent"):
                     text = str(event.get("text") or event.get("transcript") or "").strip()
                     if text and (event.get("final", True) or event_type.endswith("final")):
+                        self._voice_messages.append({"role": "assistant", "content": text})
                         await self.queue.put({"type": "caption", "text": text})
+                elif event_type == "transcript.user":
+                    text = str(event.get("text") or "").strip()
+                    if text:
+                        self._voice_messages.append({"role": "user", "content": text})
                 elif event_type == "tool.call":
                     self._tool_count += 1
                     args = event.get("arguments") or event.get("args") or {}
@@ -151,7 +168,9 @@ class VoiceAgentBackend:
                         "args": args if isinstance(args, dict) else {},
                         "id": str(event.get("call_id") or event.get("id") or ""),
                     })
-                elif event_type == "reply.done" and self._pending_results:
+                elif event_type == "reply.done":
+                    if event.get("status") == "interrupted":
+                        await self.queue.put({"type": "output_reset"})
                     pending = self._pending_results[:]
                     self._pending_results.clear()
                     for call_id, result in pending:
@@ -161,12 +180,19 @@ class VoiceAgentBackend:
                         }))
                 elif event_type == "session.error":
                     raise RuntimeError(str(event.get("message") or event.get("error") or event))
+            if not self.closed and not self.using_fallback:
+                raise ConnectionError("Voice Agent socket closed")
         except asyncio.CancelledError:
             raise
         except Exception as error:
             if not self.closed and not self.ready.is_set():
                 self._startup_error = error
                 self.ready.set()
+            elif not self.closed and not self.using_fallback:
+                LOGGER.warning("Voice Agent disconnected; switching to STT/text fallback: %s", error)
+                await self._start_fallback(resuming=True)
+                with suppress(Exception):
+                    await asyncio.wait_for(self.socket.close(), timeout=1)
 
     async def on_user_text(self, text: str) -> None:
         if self.using_fallback:
@@ -176,6 +202,7 @@ class VoiceAgentBackend:
             "type": "conversation.message", "role": "user", "content": text
         }))
         self._text_history.append(text)
+        self._voice_messages.append({"role": "user", "content": text})
         await self.socket.send(json.dumps({
             "type": "reply.create",
             "instructions": (
@@ -253,9 +280,14 @@ class VoiceAgentBackend:
         pcm24, self._input_state = audioop.ratecv(
             pcm16, 2, 1, 16000, 24000, self._input_state
         )
-        await self.socket.send(json.dumps({
-            "type": "input.audio", "audio": base64.b64encode(pcm24).decode("ascii")
-        }))
+        try:
+            await self.socket.send(json.dumps({
+                "type": "input.audio", "audio": base64.b64encode(pcm24).decode("ascii")
+            }))
+        except Exception as error:
+            if not self.closed and not self.using_fallback:
+                LOGGER.warning("Voice Agent audio send failed; switching to STT/text fallback: %s", error)
+                await self._start_fallback(resuming=True)
 
     async def tool_result(self, call_id: str, result: dict[str, Any]) -> None:
         if self.using_fallback:
