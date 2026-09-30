@@ -147,6 +147,9 @@ a dropped Voice Agent connection falls back to STT plus the text backend.
 - [Business case](docs/BUSINESS.md)
 - [Three-minute demo guide](docs/DEMO_SCRIPT.md)
 - [Printable slide deck](https://eufisky.onrender.com/slides?print-pdf)
+- [Submission PDF](https://eufisky.onrender.com/static/pitch/Eufisky-hackathon-deck.pdf)
+- [Editable PowerPoint with speaking notes](https://eufisky.onrender.com/static/pitch/Eufisky-pitch.pptx)
+- [Submission cover](https://eufisky.onrender.com/static/pitch/Eufisky-submission-cover.png)
 
 ## License
 

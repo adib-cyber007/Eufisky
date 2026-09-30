@@ -117,3 +117,26 @@ unfamiliar name "Priya Raman" as "Priyaraman" in this sample.
 Next useful hackathon work: test human recordings across accents and noise,
 report recognition/false-positive/response-time measurements, and capture a
 live voice demo of the private Guardian intervention.
+
+## Submission design update - 2026-09-30
+
+Reviewed the official AssemblyAI Voice Agent Hackathon event and lablab.ai
+submission guidance. Replaced the hosted nine-slide pitch with an export of
+the new editable PowerPoint. Added PDF, PPTX, cover and speaking-note downloads
+under `/static/pitch/`. The deck includes actual Replay screenshots, private
+choices, AssemblyAI usage, voice verification and the family pricing hypothesis.
+Replay and preloaded reports are explicitly labeled. No recognition-accuracy,
+scam-detection percentage, paying-customer or partnership claim is made.
+
+Updated `docs/SUBMISSION.md` with a 37-character title, 119-character short
+description, 381-word description, links, upload checklist, ten judge answers
+and a three-minute live voice video plan. The local submission ZIP includes the
+existing 1:43 narrated Replay MP4, PDF, editable deck, cover, submission copy
+and speaking notes. Uploading the MP4 to YouTube and pressing Submit in the
+signed-in hackathon form remain owner actions. The official event lists
+September 1-30, 2026; the signed-in form is authoritative for the exact cutoff.
+
+Checks: 89 Python tests and four Node audio checks pass. PPTX structure, fonts,
+layout, native table and import validation pass. All nine slides and PDF pages
+were visually inspected. Browser checks cover nine loaded slides, keyboard
+navigation, downloads, desktop/mobile display and nine-page print output.

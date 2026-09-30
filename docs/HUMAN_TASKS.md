@@ -88,44 +88,45 @@ If any step fails, copy exactly what you saw and use the Troubleshooting Relay P
 8. If deploy fails twice, paste the red error text to the BA (it's allowed to read errors; you aren't).
 9. **Two-device test:** on your laptop open `/senior?room=test1` and `/dashboard?room=test1`; on your phone open `/caller?room=test1` (mic ON on the phone only). Do T5 steps 1–6. Expected: identical behavior to local. Tell the BA "public two-device test worked".
 
-## T7 — Record the demo video (Days 15–17)
-**Tools (free):** OBS Studio https://obsproject.com/download (Windows installer; Display Capture + Mic/Aux). Alternative: Windows **Snipping Tool → Record** (Win11) with microphone on. Record at 1080p, 3:00 max.
-**Setup:** laptop shows two browser windows side by side — left: Dashboard (Live tab); right: Senior tab. Teammate on their phone as Caller (mic ON) in the same room quietly, OR on a second laptop. Run `tools/warm.py` 15 min before. Use room `video`.
-**Shot list & lines (rehearse twice, record two takes, keep the better):**
-1. (0:00–0:15) Face-cam optional; dashboard on screen. YOU: "Every year older adults lose billions to phone scams — and every scam happens on a call nobody is protecting. This is Eufisky: a voice agent built on AssemblyAI that guards my mother's phone line."
-2. (0:15–0:30) Teammate dials as **Sarah**. Senior tab rings with "Trusted — not monitored". YOU: "Sarah is trusted. She rings straight through. No transcription, no AI — privacy by design." Hang up.
-3. (0:30–0:55) Teammate dials as **Unknown**. Front Door greets. TEAMMATE: "This is Michael from Medicare, calling about an urgent update to her benefits." Agent connects; Senior answers. YOU: "Strangers meet the Front Door agent. Now the call is bridged — and Eufisky is listening to both sides with AssemblyAI's real-time speech recognition."
-4. (0:55–1:25) TEAMMATE: "Your benefits will be suspended today unless we verify your account. Please read me the number on your Medicare card." Point at the risk meter climbing and the chips. YOU (as Margaret, calmly): "Hold on, let me get my purse… four one two three…"
-5. (1:25–1:50) HOLD appears on the caller's phone; Guardian speaks on Senior tab. Stay silent so the audience hears it. YOU: "Get Sarah." Family tab rings (show on screen or phone) → Answer. YOU: "Eufisky paused the scammer, explained the red flag in plain words, and brought my sister on the line — Mom stayed in control the whole time."
-6. (1:50–2:20) Teammate hangs up. Dashboard History: incident card. YOU: "Afterwards, AssemblyAI redacts the personal details, and LeMUR writes a summary the family can actually read. The number is blocked automatically."
-7. (2:20–2:50) Slide 4 (architecture) on screen. YOU: "Two AssemblyAI streams give us speaker-labeled words in real time; a deterministic risk engine decides when to act; the agents decide how to say it. It's browser-simulated today — the same design drops onto a real phone line via media streams."
-8. (2:50–3:00) Landing page + URL. YOU: "Try it yourself at the link — you can be the scammer. Eufisky: a patient family member on every call."
-Upload to YouTube as **Unlisted** → copy the link. Backup: if live audio misbehaves, click **Replay demo call** on the dashboard for shots 3–6 and narrate over it.
+## T7 - Demo video and pitch (current submission update)
 
-## T8 — Submission form (Day 18)
-Open `docs/SUBMISSION.md` in the repo (GitHub → docs → SUBMISSION.md) and copy each block:
-- **Project title:** Eufisky — the voice agent that guards Mom's phone line
-- **Short description (≤140 chars):** A voice AI agent on AssemblyAI that answers strangers, spots scam patterns mid-call, and steps in to protect older adults.
-- **Long description:** paste from SUBMISSION.md (the BA wrote ~350 words covering problem, solution, AssemblyAI usage — Universal-Streaming per speaker with keyterms, turn detection, PII redaction, LeMUR, Voice Agent API if used — originality, business value, roadmap).
-- **Tags:** Voice AI · AssemblyAI · Real-time speech-to-text · LeMUR · Fraud prevention · Elder care · FastAPI · Accessibility.
-- **Cover image:** upload `docs/cover.png` (download from GitHub: click file → Download).
-- **Video:** the YouTube link from T7.
-- **Slides:** open `https://<your-url>/slides?print-pdf` in Chrome → Ctrl+P → Destination "Save as PDF" → Layout Landscape → Save as `Eufisky-slides.pdf` → upload.
-- **Repository:** `https://github.com/<you>/eufisky`
-- **Demo platform:** Web (Render). **Application URL:** your public URL.
-Run `tools/warm.py` on judging day if a date is announced.
+The prepared MP4 is approximately 1 minute 43 seconds. It narrates the saved
+Replay scenario and identifies the preloaded sample report. Upload it to
+YouTube as Unlisted and copy the share link. It does not demonstrate live
+microphone recognition.
 
-## T9 — 90-second pitch (Day 19) + likely judge questions
-**Pitch:** "Phone scams take billions from older adults every year, and they succeed on the call itself — a stranger talks a lonely person into reading out a card number. Blocklists can't stop that. Eufisky can. It's a voice agent built on AssemblyAI that guards the line. Trusted family ring straight through and are never recorded. Strangers meet the Front Door agent, which asks who's calling and why. Once connected, Eufisky listens to both sides using two AssemblyAI real-time streams, so it always knows who said 'gift card' and who started reading digits. A deterministic risk engine scores the call; when it crosses the line, the Guardian agent pauses the scammer, explains the red flag to Mom in plain words, and does what she asks — bring in her daughter, hang up, or continue. Afterwards AssemblyAI redacts the personal details and LeMUR writes the family a summary. It's original because it intervenes privately, mid-call, and keeps the senior in control. It's valuable because families, insurers and telcos all pay to prevent exactly this loss. Today it runs on a simulated line you can try in your browser; the same design drops onto real phone lines through media streams. Eufisky: a patient family member on every call."
+For a stronger live voice recording, follow the exact three-minute shot list
+in [SUBMISSION.md](SUBMISSION.md). Use a fresh room and headphones, let the
+introduction finish, show the caller on hold and ask Guardian to invite family.
+If you switch to Replay, say that it is prerecorded. If a new report is still
+processing, say so rather than showing a sample as its result.
 
-**Q&A (say these as-is):**
-1. *Why simulate the phone line?* "To make the demo universally testable — any judge can be the scammer from a browser. Real telephony is the first roadmap item; the architecture already separates the phone layer from the intelligence."
-2. *How does it know who's speaking?* "Each side of the call has its own AssemblyAI real-time stream, so every word arrives already labeled — no guessing."
-3. *Does an LLM decide to interrupt?* "No. A transparent rule engine with weighted scam signals decides when; the agent only decides how to say it, and the senior decides what to do."
-4. *False positives?* "Trusted contacts are never monitored at all. For strangers, escalation is tiered — a soft chime first, a private pause second — and it's always reversible; 'continue the call' is one word away. We tuned thresholds on 100 scripted calls: over 90% of scams trigger, under 5% of benign calls do."
-5. *Privacy?* "Family calls never touch AI. Stranger calls are announced as monitored, stored only after PII redaction, and raw audio is deleted."
-6. *What's the AssemblyAI-specific value?* "Real-time immutable transcripts fast enough to act mid-sentence, keyterm boosting for scam vocabulary, turn detection that makes the agents feel natural, batch PII redaction, and LeMUR summaries — one vendor across the live and post-call sides."
-7. *Business model?* "Family subscription, and B2B to insurers, banks and telcos who already carry the fraud losses."
-8. *Scam types covered?* "Government impersonation, bank fraud departments, grandchild emergencies, tech support, utility shutoff, lottery — the engine's vocabulary is a config file, so new patterns ship in minutes."
-9. *Caller-ID spoofing?* "A known limitation; voice verification of claimed family is on the roadmap."
-10. *What was hardest?* "Turn-taking and timing — making the pause instant and the Guardian's first words arrive within a couple of seconds, with a fallback so it never leaves Mom in silence."
+## T8 - Submit the entry
+
+Use the updated fields and checklist in [SUBMISSION.md](SUBMISSION.md).
+The title is **Eufisky: Private Help for Risky Calls**.
+
+- Prototype: https://eufisky.onrender.com/
+- Slides: https://eufisky.onrender.com/slides
+- PDF: https://eufisky.onrender.com/static/pitch/Eufisky-hackathon-deck.pdf
+- Editable deck: https://eufisky.onrender.com/static/pitch/Eufisky-pitch.pptx
+- Cover: https://eufisky.onrender.com/static/pitch/Eufisky-submission-cover.png
+- Repository: https://github.com/adib-cyber007/Eufisky
+
+Confirm team registration, add the unlisted video link, preview the entry in a
+private browser window and press Submit before the signed-in form's cutoff.
+Creating these materials does not submit the hackathon entry.
+
+## T9 - Rehearsal and judge answers
+
+The PowerPoint contains speaking notes for a three-minute presentation. The
+same notes are available from the hosted slides' Speaking notes link.
+Use the ten current judge answers in SUBMISSION.md.
+
+Supported evidence: 89 Python tests, four JavaScript audio checks and a hosted
+Chrome microphone check using synthetic English speech. Human-accent and
+noisy-room recognition, scam false positives and intervention response time
+remain unbenchmarked. There is no supported 90% detection or 5% false-alarm
+claim. Trusted contacts bypass recording and transcription. Unknown microphone
+calls request batch PII redaction, and summaries have a template fallback.
+Production consent, retention and caller-identity verification still need work.
