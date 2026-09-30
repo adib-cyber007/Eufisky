@@ -84,7 +84,8 @@ working Twilio trial number and verified destinations.
 Fixed fractional sample loss in browser resampling, microphone muting during
 PCM playback, per-chunk playback gaps, stale audio after confirmed interruption,
 and automatic hangup cutting off system speech. Closing lines now wait for the
-correct phone's playback acknowledgement, with a bounded timeout. Voice Agent
+correct phone's playback acknowledgement, with a bounded timeout. The senior's
+introduction also finishes before the live bridge opens. Voice Agent
 uses accuracy mode with adaptive pacing, recognition context and Guardian names;
 runtime disconnects switch to the existing STT/text fallback. STT only commits
 finalized words, accepts transcript-only turns and ignores duplicate turn ends.
@@ -93,9 +94,26 @@ Keyterms are balanced across benign, senior and scam vocabulary within the cap.
 Checks: 89 Python tests and 4 dependency-free Node audio checks pass; JavaScript
 syntax and diff whitespace checks pass. A public synthetic-voice baseline
 reproduced "pharmacy delivery" being transcribed as "farm delivery" and routed
-the call successfully. The same audio will be checked after deployment. No new
+the call successfully. No new
 dependency or feature flag is required. Local AssemblyAI credentials are absent;
 provider integration checks use the hosted service in isolated test rooms.
 
-Checkpoint: commit/push this coherent voice fix to origin/main (already
-authorized), then verify the deployed assets, speech recognition and call closure.
+Published to origin/main: `d36f679` (audio/recognition) and `f59308a`
+(introduction handoff). Hosted phone assets v10 are verified. The same 48 kHz
+recording, captured through 128-sample blocks, now yields "pharmacy delivery"
+correctly and routes the call. A headless Chrome test exercised getUserMedia,
+AudioWorklet, capture resampling, the phone WebSocket, provider STT and real
+Voice Agent PCM: 130 valid 100 ms frames, 5.4 seconds of returned voice audio,
+and no browser exceptions. The fixture includes trailing silence so its end
+of speech is observable rather than looping continuously.
+
+Public introduction check: INTRO at 28.67 s, playback acknowledged, BRIDGED at
+32.11 s. Public closing check: call remains open after 2.2 s, ignores an invalid
+utterance ID, then ends after the correct playback acknowledgement. The full
+public smoke check passes. Tests use synthetic English speech; no human-accent
+or noisy-room accuracy benchmark is claimed. The model still renders the
+unfamiliar name "Priya Raman" as "Priyaraman" in this sample.
+
+Next useful hackathon work: test human recordings across accents and noise,
+report recognition/false-positive/response-time measurements, and capture a
+live voice demo of the private Guardian intervention.
