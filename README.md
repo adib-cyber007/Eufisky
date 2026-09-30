@@ -143,6 +143,8 @@ a dropped Voice Agent connection falls back to STT plus the text backend.
 
 ## Submission kit
 
+- [Download the complete submission ZIP](https://eufisky.onrender.com/static/pitch/Eufisky-submission-kit.zip)
+- [Watch or download the narrated Replay demo](https://eufisky.onrender.com/static/pitch/Eufisky-demo.mp4)
 - [Ready-to-paste submission copy and scripts](docs/SUBMISSION.md)
 - [Business case](docs/BUSINESS.md)
 - [Three-minute demo guide](docs/DEMO_SCRIPT.md)

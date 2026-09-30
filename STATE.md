@@ -140,3 +140,13 @@ Checks: 89 Python tests and four Node audio checks pass. PPTX structure, fonts,
 layout, native table and import validation pass. All nine slides and PDF pages
 were visually inspected. Browser checks cover nine loaded slides, keyboard
 navigation, downloads, desktop/mobile display and nine-page print output.
+
+## Complete asset push - 2026-09-30
+
+Added the existing narrated Replay video and six-file submission ZIP under
+`app/web/static/pitch/`, with public download links in README. This puts every
+current final submission asset in the repository. Verified both copies against
+the local originals, the ZIP integrity and its embedded video. PDF, PowerPoint,
+PNG, MP4 and ZIP files have binary Git attributes to preserve their bytes.
+Publishing this checkpoint to origin/main follows the owner's request to push
+everything. YouTube upload and the hackathon form's Submit action remain open.
