@@ -157,7 +157,7 @@ telcos, insurers, banks, and senior-living operators.
 
 ### 10. What did you validate?
 
-The full local suite passes 88 Python tests plus 4 browser-audio checks. The public smoke test verifies health,
+The full local suite passes 89 Python tests plus 4 browser-audio checks. The public smoke test verifies health,
 database access, all pages, secure Dashboard WebSockets, Replay evidence,
 transcript, state and tool events, and completion. A two-device HTTPS
 microphone/voice call also passed.

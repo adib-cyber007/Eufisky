@@ -129,7 +129,7 @@ node --test tests/audio.test.cjs
 .\.venv\Scripts\python.exe tools\smoke_public.py https://eufisky.onrender.com
 ```
 
-The checked-in release passes 88 Python tests and 4 browser-audio logic checks.
+The checked-in release passes 89 Python tests and 4 browser-audio logic checks.
 The public smoke tool verifies health,
 SQLite access, every page, secure dashboard WebSockets, Replay events, and
 completion.

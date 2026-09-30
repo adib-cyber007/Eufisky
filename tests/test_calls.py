@@ -137,6 +137,26 @@ async def test_closing_line_waits_for_the_correct_phones_playback(call_setup) ->
 
 
 @pytest.mark.asyncio
+async def test_introduction_finishes_before_live_audio_bridge_opens(call_setup) -> None:
+    controller, sockets = call_setup
+    call = await controller.dial("demo", "+15550199321")
+    await controller.text("demo", "caller", "My name is Pat, calling about a delivery")
+    controller.intro_delay = 1.0
+    await controller.answer("demo", "senior")
+    intro = sockets["senior"].json[-1]
+    assert intro["type"] == "agent_say" and intro["utterance_id"]
+    assert call.state == CallState.INTRO
+    await controller.relay("demo", "caller", b"\x01\x00" * 1600)
+    assert sockets["senior"].audio == []
+    controller.playback_done("demo", "senior", intro["utterance_id"])
+    await asyncio.wait_for(call.intro_task, timeout=1)
+    assert call.state == CallState.BRIDGED
+    await controller.relay("demo", "caller", b"\x01\x00" * 1600)
+    assert len(sockets["senior"].audio) == 1
+    await controller.hangup("demo")
+
+
+@pytest.mark.asyncio
 async def test_unknown_call_transitions_records_and_family_joins(call_setup) -> None:
     controller, sockets = call_setup
     call = await controller.dial("demo", "+15550199321")

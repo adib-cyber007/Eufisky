@@ -90,7 +90,7 @@ runtime disconnects switch to the existing STT/text fallback. STT only commits
 finalized words, accepts transcript-only turns and ignores duplicate turn ends.
 Keyterms are balanced across benign, senior and scam vocabulary within the cap.
 
-Checks: 88 Python tests and 4 dependency-free Node audio checks pass; JavaScript
+Checks: 89 Python tests and 4 dependency-free Node audio checks pass; JavaScript
 syntax and diff whitespace checks pass. A public synthetic-voice baseline
 reproduced "pharmacy delivery" being transcribed as "farm delivery" and routed
 the call successfully. The same audio will be checked after deployment. No new

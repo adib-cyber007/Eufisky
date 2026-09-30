@@ -84,6 +84,7 @@ class CallSession:
         self.notice_sent = False
         self.dial_timeout: asyncio.Task[None] | None = None
         self.closing_task: asyncio.Task[None] | None = None
+        self.intro_task: asyncio.Task[None] | None = None
         self.playback_id = ""
         self.playback_role = ""
         self.playback_finished = asyncio.Event()
@@ -379,22 +380,42 @@ class CallController:
             if target == CallState.BRIDGED:
                 await self._transition(call, CallState.INTRO, "senior_answered")
                 await self._send_state(call)
+                intro = f"Call from {call.caller_name} about {call.purpose}. Connecting."
+                call.playback_id = uuid.uuid4().hex
+                call.playback_role = "senior"
+                call.playback_finished.clear()
                 await live.send_phone("senior", {
                     "type": "agent_say",
-                    "text": f"Call from {call.caller_name} about {call.purpose}. Connecting.",
+                    "text": intro, "utterance_id": call.playback_id,
                     "agent": "front_door",
                     "playback": "speech",
                 })
-                await asyncio.sleep(self.intro_delay)
-                await self._transition(call, target, "intro_complete")
-                call.monitor = CallMonitor(
-                    call, call.lexicon, self.stt_factory, seed_score=call.seed_score,
-                    on_guardian=lambda update, trigger: self._start_guardian(call, update, trigger),
-                    on_action=lambda name, args: self._guardian_action(call, name, args),
-                    on_recommendation=lambda value: self._guardian_recommendation(call, value),
-                    language=call.monitoring_language,
-                )
-                await call.monitor.start()
+                async def bridge_after_intro() -> None:
+                    if self.intro_delay:
+                        try:
+                            await asyncio.wait_for(call.playback_finished.wait(), timeout=max(self.intro_delay, len(intro.split()) / 1.8 + 3))
+                        except asyncio.TimeoutError:
+                            pass
+                    if live.current_call is not call or call.state != CallState.INTRO:
+                        return
+                    await self._transition(call, target, "intro_complete")
+                    call.monitor = CallMonitor(
+                        call, call.lexicon, self.stt_factory, seed_score=call.seed_score,
+                        on_guardian=lambda update, trigger: self._start_guardian(call, update, trigger),
+                        on_action=lambda name, args: self._guardian_action(call, name, args),
+                        on_recommendation=lambda value: self._guardian_recommendation(call, value),
+                        language=call.monitoring_language,
+                    )
+                    await call.monitor.start()
+                    await self._send_state(call)
+                    await live.send_phone("caller", {"type": "tone", "name": "connected"})
+
+                if self.intro_delay:
+                    # Leave the senior's receive loop free to acknowledge speech.
+                    call.intro_task = asyncio.create_task(bridge_after_intro(), name=f"intro-{call.id}")
+                else:
+                    await bridge_after_intro()
+                return
             else:
                 await self._transition(call, target, "senior_answered")
             await self._send_state(call)
@@ -560,6 +581,8 @@ class CallController:
             return
         if call.closing_task and call.closing_task is not asyncio.current_task() and not call.closing_task.done():
             call.closing_task.cancel()
+        if call.intro_task and call.intro_task is not asyncio.current_task() and not call.intro_task.done():
+            call.intro_task.cancel()
         if call.dial_timeout and call.dial_timeout is not asyncio.current_task() and not call.dial_timeout.done():
             call.dial_timeout.cancel()
         await self._close_frontdoor(call)

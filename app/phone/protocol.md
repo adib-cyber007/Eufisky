@@ -29,9 +29,10 @@ both people to speak at once. During system speech fallback, the browser sends
 silence rather than removing time from the microphone stream. PCM playback has
 an 80 ms initial buffer and schedules subsequent chunks contiguously.
 
-Closing `agent_say` messages include `utterance_id`. The receiving phone sends
+Introductions and closing `agent_say` messages include `utterance_id`. The receiving phone sends
 `playback_done{utterance_id}` only after speech finishes. The server then ends
-the call; a bounded timeout covers older clients or unavailable system speech.
+the call (or opens the live bridge after an introduction); a bounded timeout
+covers older clients or unavailable system speech.
 Manual hangup remains immediate.
 
 For microphone calls, conversational agent input also has exactly one path. In
